@@ -1,0 +1,218 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+
+/* ─────────────────────────────────────────────
+   Custom theme tokens (Tailwind CSS v4 @theme)
+───────────────────────────────────────────── */
+@theme {
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+
+  --color-amber-350: oklch(82% 0.15 70);
+}
+
+/* ─────────────────────────────────────────────
+   Base
+───────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: theme(colors.zinc.950);
+    color: theme(colors.zinc.100);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: theme(colors.amber.400);
+    color: theme(colors.zinc.950);
+  }
+
+  :focus-visible {
+    outline: 2px solid theme(colors.amber.400);
+    outline-offset: 3px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: theme(colors.zinc.950);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: theme(colors.zinc.700);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme(colors.amber.400);
+  }
+
+  code {
+    font-family: var(--font-mono);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Custom Animations
+───────────────────────────────────────────── */
+@layer utilities {
+  @keyframes slide-down {
+    from { transform: translateY(-100%); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes drift {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    50%       { transform: translateX(8%) translateY(-5%); }
+  }
+
+  @keyframes drift-slow {
+    0%, 100% { transform: translateX(0) translateY(0) scale(1); }
+    50%       { transform: translateX(-6%) translateY(4%) scale(1.05); }
+  }
+
+  .animate-slide-down {
+    animation: slide-down 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.7s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .animate-drift {
+    animation: drift 18s ease-in-out infinite;
+  }
+
+  .animate-drift-slow {
+    animation: drift-slow 24s ease-in-out infinite;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Scroll-triggered fade-in (JS observer)
+───────────────────────────────────────────── */
+.fade-in {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─────────────────────────────────────────────
+   Prose overrides for blog post content
+───────────────────────────────────────────── */
+.prose-content h2 {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: theme(colors.zinc.100);
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.prose-content h3 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: theme(colors.zinc.200);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-content a {
+  color: theme(colors.amber.400);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, theme(colors.amber.400) 30%, transparent);
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+}
+
+.prose-content a:hover {
+  color: theme(colors.amber.300);
+}
+
+.prose-content pre {
+  background: theme(colors.zinc.900);
+  border: 1px solid theme(colors.zinc.800);
+  border-radius: 2px;
+  padding: 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.prose-content blockquote {
+  border-left: 2px solid theme(colors.amber.400);
+  padding-left: 1.25rem;
+  color: theme(colors.zinc.400);
+  font-style: italic;
+}
+
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ql-editor {
+  white-space: pre-wrap;
+  user-select: text;
+  cursor: text;
+}
+
+.ql-container {
+  pointer-events: auto;
+}
