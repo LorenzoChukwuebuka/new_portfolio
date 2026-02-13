@@ -48,7 +48,7 @@ export interface Post {
   read_time?: number;
   status: 'draft' | 'published' | 'archived';
   published_at?: string;
-  meta_data?: Record<string, any>;
+  meta_data: Record<string, any>;
   tags?: number[];
   featured_image?: File | string;
   views_count?: number;

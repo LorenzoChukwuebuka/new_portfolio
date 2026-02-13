@@ -269,7 +269,7 @@ const form = ref<Post>({
   read_time: undefined,
   status: "draft",
   published_at: "",
-  meta_data: {},
+  meta_data: {} as any,
   tags: [],
 });
 

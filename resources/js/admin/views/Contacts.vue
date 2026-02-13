@@ -559,7 +559,7 @@ const markAsRead = async (message: ContactMessage) => {
     await fetchMessages();
     await fetchStats();
   } catch (error) {
-    alert(error.response?.data?.message || "Failed to mark as read");
+    alert((error as any).response?.data?.message || "Failed to mark as read");
   }
 };
 
@@ -572,7 +572,9 @@ const markAsReplied = async (message: ContactMessage) => {
     await fetchMessages();
     await fetchStats();
   } catch (error) {
-    alert(error.response?.data?.message || "Failed to mark as replied");
+    alert(
+      (error as any).response?.data?.message || "Failed to mark as replied"
+    );
   }
 };
 
@@ -593,7 +595,7 @@ const deleteMessage = async (message: ContactMessage) => {
     await fetchMessages();
     await fetchStats();
   } catch (error) {
-    alert(error.response?.data?.message || "Failed to delete message");
+    alert((error as any).response?.data?.message || "Failed to delete message");
   }
 };
 
@@ -616,7 +618,10 @@ const bulkMarkAsRead = async () => {
     await fetchMessages();
     await fetchStats();
   } catch (error) {
-    alert(error.response?.data?.message || "Failed to mark messages as read");
+    alert(
+      (error as any).response?.data?.message ||
+        "Failed to mark messages as read"
+    );
   }
 };
 
@@ -639,7 +644,9 @@ const bulkDelete = async () => {
     await fetchMessages();
     await fetchStats();
   } catch (error) {
-    alert(error.response?.data?.message || "Failed to delete messages");
+    alert(
+      (error as any).response?.data?.message || "Failed to delete messages"
+    );
   }
 };
 

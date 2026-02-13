@@ -174,7 +174,7 @@ const deleteProject = async (project: Project) => {
     await api.delete(`/projects/${project.id}`);
     await fetchProjects();
   } catch (error) {
-    alert(error.response?.data?.message || "An error occurred");
+    alert((error as any).response?.data?.message || "An error occurred");
   }
 };
 </script>

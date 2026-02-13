@@ -327,7 +327,7 @@ const saveProject = async () => {
 
     router.push("/admin/projects");
   } catch (error) {
-    alert(error.response?.data?.message || "An error occurred");
+    alert((error as any).response?.data?.message || "An error occurred");
   } finally {
     saving.value = false;
   }

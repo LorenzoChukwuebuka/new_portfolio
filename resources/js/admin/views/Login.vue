@@ -106,7 +106,7 @@ const handleLogin = async () => {
     await api.login(loginForm.email, loginForm.password);
     router.push("/admin/dashboard");
   } catch (error) {
-    alert(error.response?.data?.message || "Login failed");
+    alert((error as any).response?.data?.message || "Login failed");
   } finally {
     loading.value = false;
   }

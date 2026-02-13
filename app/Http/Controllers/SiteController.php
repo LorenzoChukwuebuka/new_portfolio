@@ -16,25 +16,28 @@ class SiteController extends Controller
         return response()->json($posts);
     }
 
-  public function post(string $slug)
-{
-    $post = Post::where('slug', $slug)
-        ->with(['category', 'tags', 'media'])
-        ->where('status', 'published')
-        ->firstOrFail();
+    public function post(string $slug)
+    {
+        $post = Post::where('slug', $slug)
+            ->with(['category', 'tags', 'media'])
+            ->where('status', 'published')
+            ->firstOrFail();
 
-    return response()->json($post);
-}
-
+        return response()->json($post);
+    }
 
     public function show_projects_view()
     {
         return view('project.index');
     }
 
-    public function show_project_view()
+    public function show_project_view(string $slug)
     {
-        return view('project.show');
+        $project = Project::with(['tags', 'media'])
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        return view('project.show', compact('project'));
     }
 
     public function show_blog_posts_view()

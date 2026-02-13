@@ -4,9 +4,9 @@
       <div class="flex flex-col sm:flex-row justify-between items-center gap-6">
         <!-- Logo + tagline -->
         <div class="flex items-center gap-4">
-          <span class="font-mono text-amber-400 font-bold">alex<span class="text-zinc-600">.</span>dev</span>
+          <span class="font-mono text-amber-400 font-bold">Lorenzo<span class="text-zinc-600">.</span>Chukwuebuka</span>
           <span class="hidden sm:block w-px h-4 bg-zinc-800" />
-          <span class="text-xs text-zinc-600 font-mono">Building reliable software since 2018</span>
+          <span class="text-xs text-zinc-600 font-mono">Building reliable software since 2020</span>
         </div>
 
         <!-- Social Links -->

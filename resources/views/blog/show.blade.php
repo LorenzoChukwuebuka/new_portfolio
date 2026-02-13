@@ -13,13 +13,13 @@
 @section('og_type', 'article')
 @section('og_title', $post->title)
 @section('og_description', $post->excerpt)
-@section('og_image', asset('storage/' . $post->media->first()?->url))
+@section('og_image', asset('/storage/' . $post->media->first()?->url))
 @section('og_url', route('blog.show', $post->slug))
 
 {{-- Twitter --}}
 @section('twitter_title', $post->title)
 @section('twitter_description', $post->excerpt)
-@section('twitter_image', asset('storage/' . $post->media->first()?->url))
+@section('twitter_image', asset('/storage/' . $post->media->first()?->url))
 @section('twitter_url', route('blog.show', $post->slug))
 
 @section('content')
