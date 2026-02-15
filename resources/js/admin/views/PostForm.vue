@@ -1,6 +1,36 @@
 <template>
   <Layout :page-title="isEditing ? 'Edit Post' : 'Create Post'">
     <div class="max-w-4xl">
+      <!-- Draft indicator -->
+      <div
+        v-if="hasDraft && !isEditing"
+        class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between"
+      >
+        <div class="flex items-center space-x-2">
+          <svg
+            class="w-5 h-5 text-yellow-600"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span class="text-sm font-medium text-yellow-800">
+            You have an unsaved draft from {{ draftTimestamp }}
+          </span>
+        </div>
+        <button
+          @click="clearDraft"
+          type="button"
+          class="text-sm text-yellow-700 hover:text-yellow-900 font-medium"
+        >
+          Clear Draft
+        </button>
+      </div>
+
       <form @submit.prevent="savePost" class="space-y-6">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -86,7 +116,7 @@
                 v-model="form.tags"
                 multiple
                 class="w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style="min-height: 100px;"
+                style="min-height: 100px"
               >
                 <option v-for="tag in tags" :key="tag.id" :value="tag.id">
                   {{ tag.name }}
@@ -212,6 +242,9 @@
               class="w-full text-gray-900 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p class="mt-1 text-xs text-gray-500">Max 5MB</p>
+            <p v-if="featuredImageName" class="mt-1 text-xs text-gray-600">
+              Selected: {{ featuredImageName }}
+            </p>
           </div>
         </div>
 
@@ -236,7 +269,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Quill from "quill";
 import "quill/dist/quill.snow.css";
@@ -257,7 +290,15 @@ const editorContainer = ref<HTMLElement | null>(null);
 const categories = ref<Category[]>([]);
 const tags = ref<Tag[]>([]);
 const metaKeys = ref<string[]>([]);
+const hasDraft = ref(false);
+const draftTimestamp = ref("");
+const featuredImageName = ref<string | null>(null);
+
 let quillEditor: Quill | null = null;
+
+const DRAFT_KEY = "post_form_draft";
+const DRAFT_TIMESTAMP_KEY = "post_form_draft_timestamp";
+const DRAFT_CONTENT_KEY = "post_form_draft_content";
 
 const form = ref<Post>({
   category_id: undefined,
@@ -272,6 +313,102 @@ const form = ref<Post>({
   meta_data: {} as any,
   tags: [],
 });
+
+// Load draft from localStorage
+const loadDraft = () => {
+  try {
+    const draft = localStorage.getItem(DRAFT_KEY);
+    const timestamp = localStorage.getItem(DRAFT_TIMESTAMP_KEY);
+    const content = localStorage.getItem(DRAFT_CONTENT_KEY);
+
+    if (draft && timestamp) {
+      const parsedDraft = JSON.parse(draft);
+      form.value = { ...form.value, ...parsedDraft };
+      
+      // Restore meta keys
+      if (parsedDraft.meta_data) {
+        metaKeys.value = Object.keys(parsedDraft.meta_data);
+      }
+      
+      // Restore featured image name
+      if (parsedDraft.featuredImageName) {
+        featuredImageName.value = parsedDraft.featuredImageName;
+      }
+      
+      hasDraft.value = true;
+      draftTimestamp.value = new Date(timestamp).toLocaleString();
+      
+      // Load editor content separately after Quill is initialized
+      if (content && quillEditor) {
+        quillEditor.root.innerHTML = content;
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load draft:", error);
+  }
+};
+
+// Save draft to localStorage
+const saveDraft = () => {
+  if (isEditing.value) return; // Don't save drafts when editing
+
+  try {
+    const draftData = {
+      category_id: form.value.category_id,
+      title: form.value.title,
+      slug: form.value.slug,
+      excerpt: form.value.excerpt,
+      author: form.value.author,
+      read_time: form.value.read_time,
+      status: form.value.status,
+      published_at: form.value.published_at,
+      meta_data: form.value.meta_data,
+      tags: form.value.tags,
+      featuredImageName: featuredImageName.value,
+    };
+
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+    localStorage.setItem(DRAFT_TIMESTAMP_KEY, new Date().toISOString());
+    
+    // Save editor content separately
+    if (quillEditor) {
+      localStorage.setItem(DRAFT_CONTENT_KEY, quillEditor.root.innerHTML);
+    }
+  } catch (error) {
+    console.error("Failed to save draft:", error);
+  }
+};
+
+// Clear draft from localStorage
+const clearDraft = () => {
+  localStorage.removeItem(DRAFT_KEY);
+  localStorage.removeItem(DRAFT_TIMESTAMP_KEY);
+  localStorage.removeItem(DRAFT_CONTENT_KEY);
+  hasDraft.value = false;
+  
+  // Reset form to empty state
+  form.value = {
+    category_id: undefined,
+    title: "",
+    slug: "",
+    excerpt: "",
+    content: "",
+    author: "",
+    read_time: undefined,
+    status: "draft",
+    published_at: "",
+    meta_data: {},
+    tags: [],
+  };
+  
+  metaKeys.value = [];
+  featuredImageName.value = null;
+  
+  // Clear editor content
+  if (quillEditor) {
+    quillEditor.root.innerHTML = "";
+  }
+};
 
 onMounted(async () => {
   await fetchCategories();
@@ -300,11 +437,19 @@ onMounted(async () => {
       },
       placeholder: "Write your post content here...",
     });
+
+    // Listen for text changes in the editor
+    quillEditor.on("text-change", () => {
+      if (!isEditing.value) {
+        debouncedSaveDraft();
+      }
+    });
   }
 
   const postId = route.params.slug;
 
   if (postId) {
+    // Editing mode - load post data
     isEditing.value = true;
     const { data } = await api.get(`/admin/posts/${postId}`);
 
@@ -327,11 +472,24 @@ onMounted(async () => {
     if (quillEditor && data.content) {
       quillEditor.root.innerHTML = data.content;
     }
+  } else {
+    // Create mode - try to load draft
+    loadDraft();
+    
+    // If draft has content, load it into editor
+    const savedContent = localStorage.getItem(DRAFT_CONTENT_KEY);
+    if (savedContent && quillEditor) {
+      quillEditor.root.innerHTML = savedContent;
+    }
   }
 });
 
 onBeforeUnmount(() => {
+  if (quillEditor) {
+    quillEditor.off("text-change");
+  }
   quillEditor = null;
+  clearTimeout(draftTimeout);
 });
 
 const fetchCategories = async () => {
@@ -376,8 +534,40 @@ const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files && target.files[0]) {
     form.value.featured_image = target.files[0];
+    featuredImageName.value = target.files[0].name;
   }
 };
+
+// Watch form changes and auto-save draft (debounced)
+let draftTimeout: ReturnType<typeof setTimeout>;
+const debouncedSaveDraft = () => {
+  clearTimeout(draftTimeout);
+  draftTimeout = setTimeout(() => {
+    saveDraft();
+  }, 1000); // Debounce 1 second
+};
+
+watch(
+  form,
+  () => {
+    if (!isEditing.value) {
+      debouncedSaveDraft();
+    }
+  },
+  { deep: true }
+);
+
+watch(metaKeys, () => {
+  if (!isEditing.value) {
+    debouncedSaveDraft();
+  }
+}, { deep: true });
+
+watch(featuredImageName, () => {
+  if (!isEditing.value) {
+    debouncedSaveDraft();
+  }
+});
 
 const savePost = async () => {
   if (!quillEditor) return;
@@ -412,6 +602,9 @@ const savePost = async () => {
       await api.post("/admin/posts", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      
+      // Clear draft after successful save
+      clearDraft();
     }
 
     router.push("/admin/posts");

@@ -316,6 +316,7 @@ const saveProject = async () => {
     });
 
     if (isEditing.value) {
+     formData.append("_method", "put");
       await api.post(`/admin/projects/${route.params.id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });

@@ -171,7 +171,7 @@ const deleteProject = async (project: Project) => {
   if (!confirm(`Are you sure you want to delete "${project.title}"?`)) return;
 
   try {
-    await api.delete(`/projects/${project.id}`);
+    await api.delete(`/admin/projects/${project.slug}`);
     await fetchProjects();
   } catch (error) {
     alert((error as any).response?.data?.message || "An error occurred");

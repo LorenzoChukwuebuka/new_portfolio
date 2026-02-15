@@ -23,7 +23,7 @@
           <input
             v-model="loginForm.email"
             type="email"
-            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            class="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             placeholder="Enter your email"
           />
           <p v-if="errors.email" class="text-red-500 text-sm mt-1">
@@ -39,7 +39,7 @@
           <input
             v-model="loginForm.password"
             type="password"
-            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            class="w-full rounded-lg border border-gray-300 px-4 text-gray-900 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             placeholder="Enter your password"
           />
           <p v-if="errors.password" class="text-red-500 text-sm mt-1">

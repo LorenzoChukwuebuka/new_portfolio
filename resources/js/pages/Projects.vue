@@ -20,7 +20,7 @@
             Projects I've Built
           </h2>
         </div>
-        <a
+        <!-- <a
           href="/projects"
           class="hidden md:inline-flex items-center gap-2 text-sm font-mono text-zinc-500 hover:text-amber-400 transition-colors group"
         >
@@ -38,7 +38,7 @@
               d="M17 8l4 4m0 0l-4 4m4-4H3"
             />
           </svg>
-        </a>
+        </a> -->
       </div>
 
       <!-- Loading skeleton -->
@@ -117,8 +117,9 @@ const fetchProjects = async () => {
   error.value = false;
   try {
     const { data } = await api.get("/projects");
-    projects.value = data.map(normalizeProject);
+    projects.value = data.data.map(normalizeProject);
   } catch (e) {
+    console.log((e as any).message)
     error.value = true;
   } finally {
     loading.value = false;

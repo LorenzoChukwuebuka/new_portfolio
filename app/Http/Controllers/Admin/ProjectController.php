@@ -48,7 +48,6 @@ class ProjectController extends Controller
      */
     public function store(Request $request)
     {
-
         // Convert stringified JSON to arrays if needed
         if ($request->has('technologies') && is_string($request->technologies)) {
             $request->merge(['technologies' => json_decode($request->technologies, true)]);
@@ -130,6 +129,15 @@ class ProjectController extends Controller
      */
     public function update(Request $request, Project $project)
     {
+        // Convert stringified JSON to arrays if needed
+        if ($request->has('technologies') && is_string($request->technologies)) {
+            $request->merge(['technologies' => json_decode($request->technologies, true)]);
+        }
+
+        if ($request->has('tags') && is_string($request->tags)) {
+            $request->merge(['tags' => json_decode($request->tags, true)]);
+        }
+        
         $validated = $request->validate([
             'title'            => 'required|string|max:255',
             'slug'             => [

@@ -5,7 +5,8 @@
 
 @section('meta_description', $post->excerpt)
 
-@section('meta_keywords', $post->tags->pluck('name')->join(', '))
+@section('meta_keywords', $post->meta_data['keywords'] ?? $post->tags->pluck('name')->join(', '))
+@section('author', $post->meta_data['author'] ?? 'Lorenzo Chukwuebuka Obi')
 
 @section('canonical', route('blog.show', $post->slug))
 

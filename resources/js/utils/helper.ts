@@ -9,8 +9,6 @@ function mediaUrl(path: string): string {
 
 export function normalizeProject(p: ApiProject): Project {
 
-
-    console.log(p,"pppppppppppp")
     const thumbnail = p.media.find(m => m.type === 'thumbnail')
     const image = p.media.find(m => m.type === 'image')
 

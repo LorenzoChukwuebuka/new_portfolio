@@ -113,7 +113,7 @@
         </div>
 
         <!-- Stats row -->
-        <div
+        <!-- <div
           class="animate-fade-in-up opacity-0 [animation-delay:0.85s] [animation-fill-mode:forwards] flex flex-wrap gap-10 mt-16 pt-10 border-t border-zinc-800/60"
         >
           <div v-for="stat in stats" :key="stat.label">
@@ -124,7 +124,7 @@
             </p>
             <p class="text-sm text-zinc-500 mt-1">{{ stat.label }}</p>
           </div>
-        </div>
+        </div> -->
       </div>
     </div>
   </section>

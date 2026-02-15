@@ -156,7 +156,7 @@ const deletePost = async (post: Post) => {
   if (!confirm(`Are you sure you want to delete "${post.title}"?`)) return;
 
   try {
-    await api.delete(`/admin/posts/${post.id}`);
+    await api.delete(`/admin/posts/${post.slug}`);
     await fetchPosts();
   } catch (error:any) {
     alert(error.response?.data?.message || "An error occurred");
