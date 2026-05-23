@@ -1,13 +1,17 @@
 <template>
-  <div class="bg-white rounded-lg border border-gray-200 p-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <p class="text-sm font-medium text-gray-600">{{ title }}</p>
-        <p class="mt-2 text-3xl font-bold" :class="colorClass">{{ value }}</p>
-        <p class="mt-1 text-sm text-gray-500">{{ subtitle }}</p>
+  <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          {{ title }}
+        </p>
+        <p class="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+          {{ value }}
+        </p>
+        <p class="mt-1 text-sm text-slate-500">{{ subtitle }}</p>
       </div>
-      <div class="p-3 rounded-full" :class="bgColorClass">
-        <div class="w-8 h-8" :class="colorClass">
+      <div class="rounded-md p-3" :class="bgColorClass">
+        <div class="h-6 w-6" :class="colorClass">
           <slot name="icon" />
         </div>
       </div>
@@ -27,22 +31,22 @@ const props = defineProps<{
 
 const colorClass = computed(() => {
   const colors = {
-    blue: 'text-blue-600',
-    green: 'text-green-600',
-    yellow: 'text-yellow-600',
-    purple: 'text-purple-600',
-    red: 'text-red-600',
+    blue: 'text-sky-600',
+    green: 'text-emerald-600',
+    yellow: 'text-amber-600',
+    purple: 'text-violet-600',
+    red: 'text-rose-600',
   };
   return colors[props.color || 'blue'];
 });
 
 const bgColorClass = computed(() => {
   const colors = {
-    blue: 'bg-blue-100',
-    green: 'bg-green-100',
-    yellow: 'bg-yellow-100',
-    purple: 'bg-purple-100',
-    red: 'bg-red-100',
+    blue: 'bg-sky-50',
+    green: 'bg-emerald-50',
+    yellow: 'bg-amber-50',
+    purple: 'bg-violet-50',
+    red: 'bg-rose-50',
   };
   return colors[props.color || 'blue'];
 });

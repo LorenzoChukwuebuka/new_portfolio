@@ -23,6 +23,8 @@ class SiteController extends Controller
             ->where('status', 'published')
             ->firstOrFail();
 
+        $post->incrementViews();
+
         return response()->json($post);
     }
 
@@ -66,6 +68,8 @@ class SiteController extends Controller
 
     public function show_project(Project $project)
     {
+        $project->incrementViews();
+
         return response()->json($project->load(['tags', 'media']));
     }
 }

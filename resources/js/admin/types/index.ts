@@ -25,6 +25,7 @@ export interface Project {
   completed_at?: string;
   order?: number;
   is_featured: boolean;
+  views_count?: number;
   tags?: number[];
   media:any
   thumbnail?: File | string;
@@ -69,6 +70,12 @@ export interface DashboardStats {
     completed: number;
     in_progress: number;
     featured: number;
+    total_views: number;
+  };
+  visits: {
+    total: number;
+    today: number;
+    unique_today: number;
   };
   contacts: {
     total: number;
@@ -100,4 +107,6 @@ export interface AnalyticsData {
   published?: number;
   total?: number;
   count?: number;
+  visits?: number;
+  unique?: number;
 }

@@ -13,8 +13,15 @@
         </button>
       </div>
 
+      <AdminLoader
+        v-if="loading"
+        title="Loading CVs"
+        message="Fetching uploaded CV records."
+        :rows="4"
+      />
+
       <!-- CV List -->
-      <div class="bg-white rounded-lg border border-gray-200">
+      <div v-else class="bg-white rounded-lg border border-gray-200">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -191,6 +198,7 @@ import {
   TransitionChild,
 } from "@headlessui/vue";
 import Layout from "../components/Layout.vue";
+import AdminLoader from "../components/AdminLoader.vue";
 import api from "../utils/api";
 
 const cvs = ref<any[]>([]);
@@ -198,6 +206,7 @@ const isOpen = ref(false);
 const editingCv = ref<any | null>(null);
 const saving = ref(false);
 const file = ref<File | null>(null);
+const loading = ref(true);
 
 const form = ref<any>({
   title: "",
@@ -209,8 +218,13 @@ const form = ref<any>({
 onMounted(fetchCvs);
 
 async function fetchCvs() {
-  const { data } = await api.get("/admin/cv");
-  cvs.value = data.data;
+  loading.value = true;
+  try {
+    const { data } = await api.get("/admin/cv");
+    cvs.value = data.data;
+  } finally {
+    loading.value = false;
+  }
 }
 
 function handleFile(e: any) {

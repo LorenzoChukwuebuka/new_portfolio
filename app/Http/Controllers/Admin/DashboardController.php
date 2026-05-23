@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\ContactMessage;
 use App\Models\Cv;
+use App\Models\PageVisit;
 use App\Models\Post;
 use App\Models\Project;
 use App\Models\Tag;
@@ -30,6 +31,14 @@ class DashboardController extends Controller
                 'completed'   => Project::where('status', 'completed')->count(),
                 'in_progress' => Project::where('status', 'in-progress')->count(),
                 'featured'    => Project::where('is_featured', true)->count(),
+                'total_views' => Project::sum('views_count'),
+            ],
+            'visits'     => [
+                'total'        => PageVisit::count(),
+                'today'        => PageVisit::whereDate('created_at', today())->count(),
+                'unique_today' => PageVisit::whereDate('created_at', today())
+                    ->distinct('ip_hash')
+                    ->count('ip_hash'),
             ],
             'contacts'   => [
                 'total'   => ContactMessage::count(),
@@ -118,6 +127,42 @@ class DashboardController extends Controller
             ->get();
 
         return response()->json($posts);
+    }
+
+    /**
+     * Get popular projects.
+     */
+    public function popularProjects()
+    {
+        $projects = Project::with(['tags', 'media'])
+            ->orderBy('views_count', 'desc')
+            ->take(10)
+            ->get();
+
+        return response()->json($projects);
+    }
+
+    /**
+     * Get page visit analytics.
+     */
+    public function pageVisitsAnalytics(Request $request)
+    {
+        $days = $request->get('days', 14);
+
+        $data = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+
+            $query = PageVisit::whereDate('created_at', $date);
+
+            $data[] = [
+                'date'   => $date->format('M d'),
+                'visits' => (clone $query)->count(),
+                'unique' => (clone $query)->distinct('ip_hash')->count('ip_hash'),
+            ];
+        }
+
+        return response()->json($data);
     }
 
     /**

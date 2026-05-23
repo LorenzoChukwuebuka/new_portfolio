@@ -14,8 +14,15 @@
         </button>
       </div>
 
+      <AdminLoader
+        v-if="loading"
+        title="Loading tags"
+        message="Fetching tag records."
+        :rows="5"
+      />
+
       <!-- Tags List -->
-      <div class="bg-white rounded-lg border border-gray-200">
+      <div v-else class="bg-white rounded-lg border border-gray-200">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -173,6 +180,7 @@ import {
   TransitionChild,
 } from "@headlessui/vue";
 import Layout from "../components/Layout.vue";
+import AdminLoader from "../components/AdminLoader.vue";
 import api from "../utils/api";
 //import type { Tag } from "../types";
 
@@ -186,6 +194,7 @@ const tags = ref<Tag[]>([]);
 const isOpen = ref(false);
 const editingTag = ref<Tag | null>(null);
 const saving = ref(false);
+const loading = ref(true);
 
 const form = ref<Tag>({
   name: "",
@@ -197,8 +206,13 @@ onMounted(async () => {
 });
 
 const fetchTags = async () => {
-  const { data } = await api.get("/admin/tags");
-  tags.value = data.data;
+  loading.value = true;
+  try {
+    const { data } = await api.get("/admin/tags");
+    tags.value = data.data;
+  } finally {
+    loading.value = false;
+  }
 };
 
 const openModal = (tag?: Tag) => {

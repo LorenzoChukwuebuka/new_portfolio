@@ -2,28 +2,38 @@
   <Layout page-title="Projects">
     <div class="space-y-6">
       <!-- Header -->
-      <div class="flex items-center justify-between">
+      <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <p class="text-sm text-gray-600">Manage your portfolio projects</p>
+          <h3 class="text-lg font-semibold text-slate-950">Project Library</h3>
+          <p class="mt-1 text-sm text-slate-500">Manage portfolio case studies and featured work.</p>
         </div>
         <router-link
           to="/admin/projects/create"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          class="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
         >
           Add Project
         </router-link>
       </div>
+      </div>
+
+      <AdminLoader
+        v-if="loading"
+        title="Loading projects"
+        message="Fetching portfolio projects and media."
+        :rows="6"
+      />
 
       <!-- Projects Grid -->
-      <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div
           v-for="project in projects"
           :key="project.id"
-          class="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+          class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         >
           <div
             v-if=" project.media.find((m:any) => m.type === 'thumbnail')?.thumbnail"
-            class="h-48 bg-gray-200"
+            class="h-48 bg-slate-200"
           >
             <!--@ts-ignore -->
             <img
@@ -32,33 +42,33 @@
               class="w-full h-full object-cover"
             />
           </div>
-          <div v-else class="h-48 bg-gray-100 flex items-center justify-center">
-            <span class="text-gray-400">No thumbnail</span>
+          <div v-else class="h-48 bg-slate-100 flex items-center justify-center">
+            <span class="text-sm font-medium text-slate-400">No thumbnail</span>
           </div>
 
           <div class="p-6">
             <div class="flex items-start justify-between mb-2">
-              <h3 class="text-lg font-semibold text-gray-900">
+              <h3 class="text-lg font-semibold text-slate-950">
                 {{ project.title }}
               </h3>
               <span
                 v-if="project.is_featured"
-                class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded"
+                class="rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
               >
                 Featured
               </span>
             </div>
 
-            <p class="text-sm text-gray-600 mb-4 line-clamp-2">
+            <p class="text-sm text-slate-500 mb-4 line-clamp-2">
               {{ project.description }}
             </p>
 
             <div class="flex items-center space-x-2 mb-4">
               <span
-                class="px-2 py-1 text-xs font-medium rounded capitalize"
+                class="rounded px-2 py-1 text-xs font-medium capitalize"
                 :class="getStatusColor(project.status)"
               >
-                <!-- {{ project.status.replace('-', ' ') }} -->
+                {{ project.status.replace('-', ' ') }}
               </span>
             </div>
 
@@ -66,27 +76,27 @@
               <span
                 v-for="tech in project.technologies.slice(0, 3)"
                 :key="tech"
-                class="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded"
+                class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
               >
                 {{ tech }}
               </span>
               <span
                 v-if="project.technologies.length > 3"
-                class="px-2 py-1 text-xs text-gray-500"
+                class="px-2 py-1 text-xs text-slate-500"
               >
                 +{{ project.technologies.length - 3 }}
               </span>
             </div>
 
             <div
-              class="flex justify-between items-center pt-4 border-t border-gray-200"
+              class="flex justify-between items-center pt-4 border-t border-slate-200"
             >
               <div class="flex space-x-2">
                 <a
                   v-if="project.project_link"
                   :href="project.project_link"
                   target="_blank"
-                  class="text-blue-600 hover:text-blue-700"
+                  class="text-sky-700 hover:text-sky-900"
                   title="View Project"
                 >
                   <svg
@@ -107,7 +117,7 @@
                   v-if="project.github_link"
                   :href="project.github_link"
                   target="_blank"
-                  class="text-gray-600 hover:text-gray-700"
+                  class="text-slate-600 hover:text-slate-900"
                   title="View on GitHub"
                 >
                   <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -121,13 +131,13 @@
               <div class="flex space-x-2">
                 <router-link
                   :to="`/admin/projects/${project.slug}/edit`"
-                  class="text-sm text-blue-600 hover:text-blue-700"
+                  class="text-sm font-medium text-sky-700 hover:text-sky-900"
                 >
                   Edit
                 </router-link>
                 <button
                   @click="deleteProject(project)"
-                  class="text-sm text-red-600 hover:text-red-700"
+                  class="text-sm font-medium text-rose-600 hover:text-rose-800"
                 >
                   Delete
                 </button>
@@ -143,28 +153,34 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import Layout from "../components/Layout.vue";
+import AdminLoader from "../components/AdminLoader.vue";
 import api from "../utils/api";
 import type { Project } from "../types";
 
 const projects = ref<Project[]>([]);
+const loading = ref(true);
 
 onMounted(async () => {
   await fetchProjects();
 });
 
 const fetchProjects = async () => {
-  const { data } = await api.get("/admin/projects");
-  console.log(data.data);
-  projects.value = data.data;
+  loading.value = true;
+  try {
+    const { data } = await api.get("/admin/projects");
+    projects.value = data.data;
+  } finally {
+    loading.value = false;
+  }
 };
 
 const getStatusColor = (status: string) => {
   const colors = {
-    completed: "bg-green-100 text-green-700",
-    "in-progress": "bg-blue-100 text-blue-700",
-    archived: "bg-gray-100 text-gray-700",
+    completed: "bg-emerald-50 text-emerald-700",
+    "in-progress": "bg-sky-50 text-sky-700",
+    archived: "bg-slate-100 text-slate-700",
   };
-  return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-700";
+  return colors[status as keyof typeof colors] || "bg-slate-100 text-slate-700";
 };
 
 const deleteProject = async (project: Project) => {

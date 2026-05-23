@@ -24,12 +24,14 @@ class Project extends Model
         'completed_at',
         'order',
         'is_featured',
+        'views_count',
     ];
 
     protected $casts = [
         'technologies' => 'array',
         'completed_at' => 'date',
         'is_featured' => 'boolean',
+        'views_count' => 'integer',
     ];
 
     /**
@@ -94,6 +96,14 @@ class Project extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('order')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Increment views count.
+     */
+    public function incrementViews(): void
+    {
+        $this->increment('views_count');
     }
 
     /**

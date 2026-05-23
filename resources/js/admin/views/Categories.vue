@@ -14,8 +14,15 @@
         </button>
       </div>
 
+      <AdminLoader
+        v-if="loading"
+        title="Loading categories"
+        message="Fetching category records."
+        :rows="5"
+      />
+
       <!-- Categories List -->
-      <div class="bg-white rounded-lg border border-gray-200">
+      <div v-else class="bg-white rounded-lg border border-gray-200">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -189,6 +196,7 @@ import {
   TransitionChild,
 } from "@headlessui/vue";
 import Layout from "../components/Layout.vue";
+import AdminLoader from "../components/AdminLoader.vue";
 import api from "../utils/api";
 import type { Category } from "../types";
 
@@ -196,6 +204,7 @@ const categories = ref<Category[]>([]);
 const isOpen = ref(false);
 const editingCategory = ref<Category | null>(null);
 const saving = ref(false);
+const loading = ref(true);
 
 const form = ref<Category>({
   name: "",
@@ -208,9 +217,13 @@ onMounted(async () => {
 });
 
 const fetchCategories = async () => {
-  const { data } = await api.get("/admin/categories");
- // console.log(data, "categories");
-  categories.value = data.data;
+  loading.value = true;
+  try {
+    const { data } = await api.get("/admin/categories");
+    categories.value = data.data;
+  } finally {
+    loading.value = false;
+  }
 };
 
 const openModal = (category?: Category) => {

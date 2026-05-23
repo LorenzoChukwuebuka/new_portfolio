@@ -1,40 +1,94 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Sidebar -->
-    <div class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200">
-      <div class="flex flex-col h-full">
-        <div class="p-6 border-b border-gray-200">
-          <h1 class="text-xl font-bold text-gray-900">Admin Panel</h1>
+  <div class="min-h-screen bg-slate-100 text-slate-950">
+    <div
+      v-if="sidebarOpen"
+      class="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+      @click="sidebarOpen = false"
+    />
+
+    <aside
+      class="fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-slate-950 text-white transition-transform duration-200 lg:translate-x-0"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
+      <div class="flex h-full flex-col">
+        <div class="border-b border-white/10 px-6 py-5">
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
+            Portfolio CMS
+          </p>
+          <h1 class="mt-2 text-lg font-semibold tracking-tight">
+            Lorenzo Admin
+          </h1>
         </div>
 
-        <nav class="flex-1 p-4 space-y-1">
+        <nav class="flex-1 space-y-1 px-3 py-5">
           <router-link
             v-for="item in navigation"
             :key="item.name"
             :to="item.href"
-            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors"
+            class="group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors"
             :class="
               isActive(item.href)
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-gray-700 hover:bg-gray-50'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
             "
+            @click="sidebarOpen = false"
           >
-            <component :is="item.icon" class="w-5 h-5 mr-3" />
+            <component
+              :is="item.icon"
+              class="h-5 w-5 shrink-0"
+              :class="isActive(item.href) ? 'text-amber-500' : 'text-slate-500 group-hover:text-slate-200'"
+            />
             {{ item.name }}
           </router-link>
         </nav>
-      </div>
-    </div>
 
-    <!-- Main content -->
-    <div class="pl-64">
-      <header class="bg-white border-b border-gray-200">
-        <div class="px-8 py-4">
-          <h2 class="text-2xl font-bold text-gray-900">{{ pageTitle }}</h2>
+        <div class="border-t border-white/10 p-4">
+          <a
+            href="/"
+            class="flex items-center justify-between rounded-md border border-white/10 px-3 py-2 text-sm text-slate-300 transition-colors hover:border-amber-300/50 hover:text-white"
+          >
+            <span>View Site</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <div class="lg:pl-72">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div class="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div class="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-600 lg:hidden"
+              @click="sidebarOpen = true"
+              aria-label="Open sidebar"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div class="min-w-0">
+              <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                Admin Workspace
+              </p>
+              <h2 class="truncate text-2xl font-semibold tracking-tight text-slate-950">
+                {{ pageTitle }}
+              </h2>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            @click="logout"
+          >
+            Logout
+          </button>
         </div>
       </header>
 
-      <main class="p-8">
+      <main class="px-4 py-6 sm:px-6 lg:px-8">
         <slot />
       </main>
     </div>
@@ -42,8 +96,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import api from "../utils/api";
 
 interface NavigationItem {
   name: string;
@@ -51,27 +106,27 @@ interface NavigationItem {
   icon: any;
 }
 
-const props = defineProps<{
+defineProps<{
   pageTitle: string;
 }>();
 
 const route = useRoute();
-
-const navigation: NavigationItem[] = [
-  { name: "Dashboard", href: "/admin/dashboard", icon: "DashboardIcon" },
-  { name: "Posts", href: "/admin/posts", icon: "DocumentIcon" },
-  { name: "Projects", href: "/admin/projects", icon: "FolderIcon" },
-  { name: "Categories", href: "/admin/categories", icon: "TagIcon" },
-  { name: "Tags", href: "/admin/tags", icon: "HashtagIcon" },
-  { name: "Contacts", href: "/admin/contacts", icon: "MailIcon" },
-  { name: "CVs", href: "/admin/cv", icon: "DocumentTextIcon" },
-];
+const router = useRouter();
+const sidebarOpen = ref(false);
 
 const isActive = (href: string) => {
   if (href === "/admin") {
     return route.path === href;
   }
   return route.path.startsWith(href);
+};
+
+const logout = async () => {
+  try {
+    await api.logout();
+  } finally {
+    router.push("/admin");
+  }
 };
 
 // Simple icon components (you can replace with heroicons)
@@ -103,4 +158,14 @@ const DocumentTextIcon = {
   template:
     '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
 };
+
+const navigation: NavigationItem[] = [
+  { name: "Dashboard", href: "/admin/dashboard", icon: DashboardIcon },
+  { name: "Posts", href: "/admin/posts", icon: DocumentIcon },
+  { name: "Projects", href: "/admin/projects", icon: FolderIcon },
+  { name: "Categories", href: "/admin/categories", icon: TagIcon },
+  { name: "Tags", href: "/admin/tags", icon: HashtagIcon },
+  { name: "Contacts", href: "/admin/contacts", icon: MailIcon },
+  { name: "CVs", href: "/admin/cv", icon: DocumentTextIcon },
+];
 </script>

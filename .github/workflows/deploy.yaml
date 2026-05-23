@@ -1,0 +1,89 @@
+name: Deploy Laravel + Vue (cPanel)
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Build Vue assets inside Laravel
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node Dependencies
+        run: npm install --force
+
+      - name: Build Assets
+        run: npm run build
+
+      # Install PHP dependencies (so server doesn't need composer)
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      # Setup SSH on the runner
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.CPANEL_SSH_SECRET }}" > ~/.ssh/id_ecdsa
+          echo "${{ secrets.CPANEL_SSH_PUBLIC_KEY }}" > ~/.ssh/id_ecdsa.pub
+          chmod 600 ~/.ssh/id_ecdsa
+          chmod 600 ~/.ssh/id_ecdsa.pub
+          ssh-keyscan -H -p 428 ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      # Push to a timestamped release folder
+      - name: Deploy Files to Server
+        run: |
+          RELEASE=$(date +%Y-%m-%d_%H-%M-%S)
+          echo "RELEASE=$RELEASE" >> $GITHUB_ENV
+          rsync -avz \
+            -e "ssh -i ~/.ssh/id_ecdsa -p 428 -o StrictHostKeyChecking=no" \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='.github' \
+            --exclude='storage' \
+            ./ \
+            ${{ secrets.CPANEL_USER }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.CPANEL_USER }}/production/releases/$RELEASE/
+
+      # Activate release and run Laravel commands
+      # - name: Activate Release & Run Laravel Commands
+      #   uses: appleboy/ssh-action@v1.0.3
+      #   with:
+      #     host: ${{ secrets.SERVER_IP }}
+      #     username: ${{ secrets.CPANEL_USER }}
+      #     key: ${{ secrets.CPANEL_SSH_SECRET }}
+      #     port: 428
+      #     script: |
+      #       BASE=/home/${{ secrets.CPANEL_USER }}/production
+      #       RELEASE=${{ env.RELEASE }}
+
+      #       # Link shared .env and storage into the new release
+      #       ln -sf $BASE/shared/.env $BASE/releases/$RELEASE/.env
+      #       ln -sf $BASE/shared/storage $BASE/releases/$RELEASE/storage
+
+      #       # Point current symlink to new release
+      #       ln -sfn $BASE/releases/$RELEASE $BASE/current
+
+      #       # Run Laravel commands
+      #       cd $BASE/current
+      #       php artisan migrate --force
+      #       php artisan config:cache
+      #       php artisan storage:link
+      #       php artisan route:cache
+      #       php artisan view:cache
+
+      #       # Keep only last 5 releases, delete older ones
+      #       ls -dt $BASE/releases/*/ | tail -n +6 | xargs rm -rf

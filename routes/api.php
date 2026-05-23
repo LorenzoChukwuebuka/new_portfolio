@@ -37,7 +37,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
         Route::get('/', 'index');
         Route::get('/recent-activities', 'recentActivities');
         Route::get('/popular-posts', 'popularPosts');
+        Route::get('/popular-projects', 'popularProjects');
         Route::get('/posts-analytics', 'postsAnalytics');
+        Route::get('/page-visits-analytics', 'pageVisitsAnalytics');
         Route::get('/contacts-analytics', 'contactsAnalytics');
     });
 

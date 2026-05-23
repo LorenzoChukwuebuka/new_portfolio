@@ -25,6 +25,7 @@ export interface ApiProject {
   completed_at: string | null
   order: number
   is_featured: boolean
+  views_count?: number
   created_at: string
   updated_at: string
   tags: string[]

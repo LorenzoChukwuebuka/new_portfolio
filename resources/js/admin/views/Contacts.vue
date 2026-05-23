@@ -87,8 +87,15 @@
         </div>
       </div>
 
+      <AdminLoader
+        v-if="loading"
+        title="Loading messages"
+        message="Fetching contact messages and inbox stats."
+        :rows="6"
+      />
+
       <!-- Messages Table -->
-      <div class="bg-white rounded-lg border border-gray-200">
+      <div v-else class="bg-white rounded-lg border border-gray-200">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -417,6 +424,7 @@ import {
   TransitionChild,
 } from "@headlessui/vue";
 import Layout from "../components/Layout.vue";
+import AdminLoader from "../components/AdminLoader.vue";
 import api from "../utils/api";
 
 interface ContactMessage {
@@ -484,11 +492,15 @@ const filters = ref({
 const selectedMessages = ref<number[]>([]);
 const isModalOpen = ref(false);
 const selectedMessage = ref<ContactMessage | null>(null);
+const loading = ref(true);
 let searchTimeout: ReturnType<typeof setTimeout>;
 
 onMounted(async () => {
-  await fetchStats();
-  await fetchMessages();
+  try {
+    await Promise.all([fetchStats(), fetchMessages()]);
+  } finally {
+    loading.value = false;
+  }
 });
 
 const fetchStats = async () => {
