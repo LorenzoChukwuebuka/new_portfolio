@@ -41,9 +41,9 @@
         <p
           class="animate-fade-in-up opacity-0 [animation-delay:0.5s] [animation-fill-mode:forwards] text-lg sm:text-xl text-zinc-400 leading-relaxed max-w-2xl mb-4"
         >
-          I help founders and teams turn messy product ideas into production-ready
-          Laravel, Go, payment, dashboard, and SaaS systems that are maintainable
-          after launch.
+          I work with founders and teams to build production-ready Laravel, Go,
+          payment, dashboard, and SaaS systems with a focus on clarity,
+          reliability, and long-term maintainability.
         </p>
 
         <!-- Tech Stack inline -->
