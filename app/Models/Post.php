@@ -7,6 +7,7 @@ use App\Models\Tag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -57,6 +58,26 @@ class Post extends Model
     public function media(): MorphMany
     {
         return $this->morphMany(Media::class, 'mediable');
+    }
+
+    /**
+     * Get all comments for the post.
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(BlogComment::class);
+    }
+
+    /**
+     * Get approved top-level comments for public display.
+     */
+    public function approvedComments(): HasMany
+    {
+        return $this->comments()
+            ->whereNull('parent_id')
+            ->where('is_approved', true)
+            ->with('replies')
+            ->oldest();
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\TagController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BlogCommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
@@ -24,6 +25,8 @@ Route::post('/contact', [ContactController::class, 'store']);
 
 Route::get("/posts", [SiteController::class, "show_posts"]);
 Route::get("/posts/{post}", [SiteController::class, "post"]);
+Route::get("/posts/{post}/comments", [BlogCommentController::class, "index"]);
+Route::post("/posts/{post}/comments", [BlogCommentController::class, "store"]);
 Route::get("/projects/{project}", [SiteController::class, "show_project"]);
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
