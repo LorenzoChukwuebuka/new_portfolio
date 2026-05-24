@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\BlogCommentController as AdminBlogCommentController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use App\Http\Controllers\Admin\CvController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -22,6 +23,7 @@ Route::post('/admin/login', [AuthController::class, 'login']);
 Route::post('/admin/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get("/projects", [SiteController::class, "show_projects"]);
 Route::post('/contact', [ContactController::class, 'store']);
+Route::get('/cv/active', [ContactController::class, 'activeCv']);
 
 Route::get("/posts", [SiteController::class, "show_posts"]);
 Route::get("/posts/{post}", [SiteController::class, "post"]);
@@ -35,6 +37,15 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::apiResource("projects", ProjectController::class);
     Route::apiResource("posts", PostController::class);
     Route::apiResource("cv", CvController::class);
+
+    Route::prefix('comments')->controller(AdminBlogCommentController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('/stats', 'stats');
+        Route::post('/{comment}/approve', 'approve');
+        Route::post('/{comment}/pending', 'markPending');
+        Route::post('/{comment}/spam', 'markSpam');
+        Route::delete('/{comment}', 'destroy');
+    });
 
     Route::prefix('dashboard')->controller(DashboardController::class)->group(function () {
         Route::get('/', 'index');

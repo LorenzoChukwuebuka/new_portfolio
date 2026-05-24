@@ -9,6 +9,7 @@ import Login from './views/Login.vue';
 import Tags from './views/Tags.vue';
 import CV from './views/CV.vue';
 import Contacts from './views/Contacts.vue';
+import Comments from './views/Comments.vue';
 
 const routes = [
     {
@@ -17,7 +18,7 @@ const routes = [
         component: Dashboard,
     },
     {
-        path: "/admin",
+        path: "/admin/login",
         name: 'Login',
         component: Login
     },
@@ -70,6 +71,11 @@ const routes = [
         path:"/admin/contacts",
         name:"contacts",
         component:Contacts
+    },
+    {
+        path:"/admin/comments",
+        name:"comments",
+        component:Comments
     }
 ];
 

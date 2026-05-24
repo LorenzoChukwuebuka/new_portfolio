@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\ContactMessageRequest;
+use App\Mail\ContactMessageReceived;
+use App\Models\Cv;
 use App\Models\ContactMessage;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ContactController extends Controller
 {
@@ -23,8 +27,18 @@ class ContactController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        // You can also send email notification here
-        // Mail::to('your@email.com')->send(new ContactMessageReceived($message));
+        $recipient = config('mail.contact_to');
+
+        if ($recipient) {
+            try {
+                Mail::to($recipient)->send(new ContactMessageReceived($message));
+            } catch (Throwable $exception) {
+                Log::warning('Contact notification email could not be sent.', [
+                    'message_id' => $message->id,
+                    'error'      => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -35,12 +49,29 @@ class ContactController extends Controller
     /**
      * Download CV.
      */
-    public function downloadCv(int $id)
+    public function activeCv(): JsonResponse
     {
-        $cv = \App\Models\Cv::findOrFail($id);
-        
+        $cv = Cv::active()->first();
+
+        if (! $cv) {
+            return response()->json(['message' => 'No active CV found.'], 404);
+        }
+
+        return response()->json([
+            'title'        => $cv->title,
+            'download_url' => route('cv.download.active'),
+        ]);
+    }
+
+    /**
+     * Download the active public CV.
+     */
+    public function downloadActiveCv()
+    {
+        $cv = Cv::active()->firstOrFail();
+
         $cv->incrementDownloads();
-        
-        return response()->download(storage_path('app/' . $cv->file_path), $cv->file_name);
+
+        return Storage::disk('public')->download($cv->file_path, $cv->file_name);
     }
 }

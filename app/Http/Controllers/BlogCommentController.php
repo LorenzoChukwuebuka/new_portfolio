@@ -47,14 +47,14 @@ class BlogCommentController extends Controller
 
         $comment = $post->comments()->create([
             ...$validated,
-            'is_approved' => true,
+            'is_approved' => false,
+            'status'      => 'pending',
             'ip_hash'     => $request->ip() ? hash('sha256', $request->ip()) : null,
             'user_agent'  => str($request->userAgent())->limit(500, '')->toString(),
         ]);
 
         return response()->json([
-            'message' => 'Comment posted.',
-            'comment' => $this->formatComment($comment->load('replies')),
+            'message' => 'Thanks. Your comment is waiting for approval.',
         ], 201);
     }
 

@@ -430,7 +430,7 @@ async function submitComment(parentId?: number) {
   const source = parentId ? replyForm : commentForm;
 
   try {
-    await api.post(`/posts/${currentSlug.value}/comments`, {
+    const { data } = await api.post(`/posts/${currentSlug.value}/comments`, {
       author_name: source.author_name,
       author_email: source.author_email,
       body: source.body,
@@ -443,7 +443,7 @@ async function submitComment(parentId?: number) {
     source.body = "";
     if (!parentId) commentForm.website = "";
     replyingTo.value = null;
-    commentNotice.value = "Comment posted.";
+    commentNotice.value = data.message || "Thanks. Your comment is waiting for approval.";
     await fetchComments();
   } catch (error: any) {
     commentError.value = error.response?.data?.message || "Could not post comment.";

@@ -66,6 +66,12 @@
                     :style="{ width: `${barWidth(stats?.contacts.unread || 0, Math.max(stats?.contacts.total || 0, 1))}%` }"
                   />
                 </div>
+                <div class="mt-4 border-t border-slate-100 pt-4">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="font-medium text-slate-700">CV downloads</span>
+                    <span class="font-semibold text-amber-700">{{ stats?.cvs.total_downloads || 0 }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

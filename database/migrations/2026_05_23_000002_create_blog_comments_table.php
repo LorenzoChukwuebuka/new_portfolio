@@ -18,7 +18,8 @@ return new class extends Migration
             $table->string('author_name');
             $table->string('author_email');
             $table->text('body');
-            $table->boolean('is_approved')->default(true);
+            $table->boolean('is_approved')->default(false);
+            $table->string('status', 20)->default('pending')->index();
             $table->string('ip_hash', 64)->nullable();
             $table->string('user_agent', 500)->nullable();
             $table->timestamps();

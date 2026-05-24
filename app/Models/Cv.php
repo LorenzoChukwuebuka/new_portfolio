@@ -31,7 +31,7 @@ class Cv extends Model
      */
     public function getUrlAttribute(): string
     {
-        return Storage::url($this->file_path);
+        return Storage::disk('public')->url($this->file_path);
     }
 
     /**
@@ -54,7 +54,7 @@ class Cv extends Model
      */
     public function getDownloadUrlAttribute(): string
     {
-        return route('cv.download', $this->id);
+        return route('cv.download.active');
     }
 
     /**
@@ -87,7 +87,7 @@ class Cv extends Model
      */
     public function deleteFile(): bool
     {
-        return Storage::delete($this->file_path);
+        return Storage::disk('public')->delete($this->file_path);
     }
 
     /**

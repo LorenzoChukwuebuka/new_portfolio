@@ -18,6 +18,7 @@ class BlogComment extends Model
         'author_email',
         'body',
         'is_approved',
+        'status',
         'ip_hash',
         'user_agent',
     ];
@@ -39,12 +40,12 @@ class BlogComment extends Model
     public function replies(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id')
-            ->where('is_approved', true)
+            ->where('status', 'approved')
             ->oldest();
     }
 
     public function scopeApproved($query)
     {
-        return $query->where('is_approved', true);
+        return $query->where('status', 'approved');
     }
 }

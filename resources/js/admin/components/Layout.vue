@@ -154,6 +154,10 @@ const MailIcon = {
   template:
     '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>',
 };
+const CommentIcon = {
+  template:
+    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a10.4 10.4 0 01-4-.78L3 20l1.35-3.6A7.38 7.38 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>',
+};
 const DocumentTextIcon = {
   template:
     '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
@@ -166,6 +170,7 @@ const navigation: NavigationItem[] = [
   { name: "Categories", href: "/admin/categories", icon: TagIcon },
   { name: "Tags", href: "/admin/tags", icon: HashtagIcon },
   { name: "Contacts", href: "/admin/contacts", icon: MailIcon },
+  { name: "Comments", href: "/admin/comments", icon: CommentIcon },
   { name: "CVs", href: "/admin/cv", icon: DocumentTextIcon },
 ];
 </script>

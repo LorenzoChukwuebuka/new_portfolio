@@ -94,6 +94,16 @@
           >
             Contact Me
           </a>
+          <a
+            v-if="cvDownloadUrl"
+            :href="cvDownloadUrl"
+            class="inline-flex items-center gap-2 px-7 py-3.5 border border-zinc-800 text-zinc-300 font-semibold text-sm hover:border-amber-400 hover:text-amber-400 transition-all duration-300"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v11m0 0l-4-4m4 4l4-4M4 20h16" />
+            </svg>
+            Download CV
+          </a>
         </div>
 
         <!-- Stats row -->
@@ -137,6 +147,25 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
+
+const cvDownloadUrl = ref("");
+
+onMounted(async () => {
+  try {
+    const response = await fetch("/api/cv/active", {
+      headers: { Accept: "application/json" },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      cvDownloadUrl.value = data.download_url;
+    }
+  } catch {
+    cvDownloadUrl.value = "";
+  }
+});
+
 const techStack = [
   "Laravel",
   "Go",

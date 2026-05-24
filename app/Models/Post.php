@@ -75,7 +75,7 @@ class Post extends Model
     {
         return $this->comments()
             ->whereNull('parent_id')
-            ->where('is_approved', true)
+            ->where('status', 'approved')
             ->with('replies')
             ->oldest();
     }

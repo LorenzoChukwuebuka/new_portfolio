@@ -89,7 +89,7 @@ class CvController extends Controller
         // Handle file replacement if new file uploaded
         if ($request->hasFile('file')) {
             // Delete old file
-            Storage::delete($cv->file_path);
+            Storage::disk('public')->delete($cv->file_path);
 
             // Upload new file
             $file     = $request->file('file');
