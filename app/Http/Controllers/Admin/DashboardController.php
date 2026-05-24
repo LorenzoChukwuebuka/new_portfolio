@@ -166,6 +166,70 @@ class DashboardController extends Controller
     }
 
     /**
+     * Get the latest anonymous site visits for dashboard inspection.
+     */
+    public function recentVisits()
+    {
+        $visits = PageVisit::query()
+            ->latest()
+            ->take(25)
+            ->get()
+            ->map(function (PageVisit $visit) {
+                $refererHost = $visit->referer
+                    ? parse_url($visit->referer, PHP_URL_HOST)
+                    : null;
+
+                return [
+                    'id'         => $visit->id,
+                    'path'       => $visit->path,
+                    'visitor'    => $visit->ip_hash ? substr($visit->ip_hash, 0, 8) : 'unknown',
+                    'source'     => $refererHost ?: 'Direct',
+                    'user_agent' => $visit->user_agent,
+                    'visited_at' => $visit->created_at,
+                ];
+            });
+
+        return response()->json($visits);
+    }
+
+    /**
+     * Get the most frequently visited public pages.
+     */
+    public function topPages()
+    {
+        $pages = PageVisit::query()
+            ->select('path')
+            ->selectRaw('COUNT(*) as visits')
+            ->selectRaw('COUNT(DISTINCT ip_hash) as unique_visitors')
+            ->selectRaw('MAX(created_at) as last_visit')
+            ->groupBy('path')
+            ->orderByDesc('visits')
+            ->take(10)
+            ->get();
+
+        return response()->json($pages);
+    }
+
+    /**
+     * Get blog post performance data for editorial decisions.
+     */
+    public function postPerformance()
+    {
+        $posts = Post::query()
+            ->with('category:id,name')
+            ->withCount([
+                'comments',
+                'comments as approved_comments_count' => fn ($query) => $query->where('status', 'approved'),
+                'comments as pending_comments_count' => fn ($query) => $query->where('status', 'pending'),
+            ])
+            ->orderByDesc('views_count')
+            ->orderByDesc('published_at')
+            ->get(['id', 'category_id', 'title', 'slug', 'status', 'views_count', 'published_at', 'created_at']);
+
+        return response()->json($posts);
+    }
+
+    /**
      * Get posts analytics by month.
      */
     public function postsAnalytics(Request $request)

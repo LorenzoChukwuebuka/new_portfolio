@@ -110,3 +110,25 @@ export interface AnalyticsData {
   visits?: number;
   unique?: number;
 }
+
+export interface RecentVisit {
+  id: number;
+  path: string;
+  visitor: string;
+  source: string;
+  user_agent?: string | null;
+  visited_at: string;
+}
+
+export interface TopPage {
+  path: string;
+  visits: number;
+  unique_visitors: number;
+  last_visit: string;
+}
+
+export interface PostPerformance extends Post {
+  comments_count: number;
+  approved_comments_count: number;
+  pending_comments_count: number;
+}

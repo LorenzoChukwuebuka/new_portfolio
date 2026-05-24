@@ -169,45 +169,121 @@
           </div>
         </section>
 
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr_0.55fr]">
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 class="text-base font-semibold text-slate-950">Recent Site Visits</h3>
+                <p class="mt-1 text-sm text-slate-500">Latest public page requests, with visitors anonymized</p>
+              </div>
+              <span class="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                Latest {{ recentVisits.length }}
+              </span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">When</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Page</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Source</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Visitor</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Device</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                  <tr v-if="!recentVisits.length">
+                    <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">
+                      Visits will appear here once the live site receives traffic.
+                    </td>
+                  </tr>
+                  <tr v-for="visit in recentVisits" :key="visit.id" class="hover:bg-slate-50">
+                    <td class="whitespace-nowrap px-5 py-3 text-slate-600">{{ formatDate(visit.visited_at) }}</td>
+                    <td class="max-w-[260px] truncate px-5 py-3 font-medium text-slate-950" :title="visit.path">
+                      {{ visit.path }}
+                    </td>
+                    <td class="max-w-[150px] truncate px-5 py-3 text-slate-600" :title="visit.source">
+                      {{ visit.source }}
+                    </td>
+                    <td class="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate-500">
+                      {{ visit.visitor }}
+                    </td>
+                    <td class="max-w-[190px] truncate px-5 py-3 text-slate-500" :title="visit.user_agent || ''">
+                      {{ agentLabel(visit.user_agent) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4">
+              <h3 class="text-base font-semibold text-slate-950">Top Pages</h3>
+              <p class="mt-1 text-sm text-slate-500">Pages people open most</p>
+            </div>
+            <div class="divide-y divide-slate-100">
+              <p v-if="!topPages.length" class="px-5 py-10 text-center text-sm text-slate-500">No page visits yet.</p>
+              <div v-for="page in topPages" :key="page.path" class="px-5 py-4">
+                <p class="truncate text-sm font-medium text-slate-950" :title="page.path">{{ page.path }}</p>
+                <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>{{ page.unique_visitors }} unique visitors</span>
+                  <span class="font-semibold text-slate-700">{{ page.visits }} visits</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm xl:col-span-2">
-            <div class="border-b border-slate-200 px-5 py-4">
-              <h3 class="text-base font-semibold text-slate-950">Top Content</h3>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 class="text-base font-semibold text-slate-950">Blog Post Overview</h3>
+                <p class="mt-1 text-sm text-slate-500">Views and comment activity by post</p>
+              </div>
+              <span class="rounded-md bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                {{ postPerformance.length }} posts
+              </span>
             </div>
-            <div class="grid grid-cols-1 divide-y divide-slate-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-              <div class="p-5">
-                <p class="mb-4 text-sm font-semibold text-slate-700">Popular Posts</p>
-                <div class="space-y-4">
-                  <div
-                    v-for="post in popularPosts.slice(0, 5)"
-                    :key="post.id"
-                    class="grid grid-cols-[1fr_auto] items-center gap-4"
-                  >
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-medium text-slate-950">{{ post.title }}</p>
-                      <p class="text-xs text-slate-500">{{ post.category?.name || "Uncategorized" }}</p>
-                    </div>
-                    <span class="text-sm font-semibold text-sky-700">{{ post.views_count || 0 }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="p-5">
-                <p class="mb-4 text-sm font-semibold text-slate-700">Popular Projects</p>
-                <div class="space-y-4">
-                  <div
-                    v-for="project in popularProjects.slice(0, 5)"
-                    :key="project.id"
-                    class="grid grid-cols-[1fr_auto] items-center gap-4"
-                  >
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-medium text-slate-950">{{ project.title }}</p>
-                      <p class="text-xs capitalize text-slate-500">{{ project.status }}</p>
-                    </div>
-                    <span class="text-sm font-semibold text-emerald-700">{{ project.views_count || 0 }}</span>
-                  </div>
-                </div>
-              </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Post</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
+                    <th class="px-5 py-3 text-right text-xs font-semibold uppercase text-slate-500">Views</th>
+                    <th class="px-5 py-3 text-right text-xs font-semibold uppercase text-slate-500">Comments</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Published</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-if="!postPerformance.length">
+                    <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No blog posts created yet.</td>
+                  </tr>
+                  <tr v-for="post in postPerformance" :key="post.id" class="hover:bg-slate-50">
+                    <td class="max-w-[300px] px-5 py-3">
+                      <p class="truncate font-medium text-slate-950">{{ post.title }}</p>
+                      <p class="truncate text-xs text-slate-500">{{ post.category?.name || "Uncategorized" }}</p>
+                    </td>
+                    <td class="whitespace-nowrap px-5 py-3">
+                      <span class="rounded px-2 py-1 text-xs font-medium capitalize" :class="getStatusColor(post.status)">
+                        {{ post.status }}
+                      </span>
+                    </td>
+                    <td class="whitespace-nowrap px-5 py-3 text-right font-semibold text-sky-700">{{ post.views_count || 0 }}</td>
+                    <td class="whitespace-nowrap px-5 py-3 text-right text-slate-700">
+                      <span class="font-semibold">{{ post.approved_comments_count }}</span>
+                      <span v-if="post.pending_comments_count" class="ml-2 rounded bg-amber-50 px-1.5 py-1 text-xs font-semibold text-amber-700">
+                        {{ post.pending_comments_count }} pending
+                      </span>
+                    </td>
+                    <td class="whitespace-nowrap px-5 py-3 text-slate-500">
+                      {{ post.published_at ? formatShortDate(post.published_at) : "-" }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -296,7 +372,7 @@ import { computed, ref, onMounted } from "vue";
 import Layout from "../components/Layout.vue";
 import AdminLoader from "../components/AdminLoader.vue";
 import api from "../utils/api";
-import type { DashboardStats, Activity, Post, AnalyticsData } from "../types";
+import type { DashboardStats, Activity, Post, AnalyticsData, RecentVisit, TopPage, PostPerformance } from "../types";
 
 const stats = ref<DashboardStats | null>(null);
 const recentActivities = ref<Activity[]>([]);
@@ -305,6 +381,9 @@ const popularProjects = ref<any[]>([]);
 const postsAnalytics = ref<AnalyticsData[]>([]);
 const pageVisitsAnalytics = ref<AnalyticsData[]>([]);
 const contactsAnalytics = ref<AnalyticsData[]>([]);
+const recentVisits = ref<RecentVisit[]>([]);
+const topPages = ref<TopPage[]>([]);
+const postPerformance = ref<PostPerformance[]>([]);
 const loading = ref(true);
 
 const maxPageVisits = computed(() =>
@@ -408,6 +487,9 @@ onMounted(async () => {
       fetchPopularProjects(),
       fetchPostsAnalytics(),
       fetchPageVisitsAnalytics(),
+      fetchRecentVisits(),
+      fetchTopPages(),
+      fetchPostPerformance(),
       fetchContactsAnalytics(),
     ]);
   } finally {
@@ -445,6 +527,21 @@ const fetchPageVisitsAnalytics = async () => {
   pageVisitsAnalytics.value = data;
 };
 
+const fetchRecentVisits = async () => {
+  const { data } = await api.get("/admin/dashboard/recent-visits");
+  recentVisits.value = data;
+};
+
+const fetchTopPages = async () => {
+  const { data } = await api.get("/admin/dashboard/top-pages");
+  topPages.value = data;
+};
+
+const fetchPostPerformance = async () => {
+  const { data } = await api.get("/admin/dashboard/post-performance");
+  postPerformance.value = data;
+};
+
 const fetchContactsAnalytics = async () => {
   const { data } = await api.get("/admin/dashboard/contacts-analytics");
   contactsAnalytics.value = data;
@@ -458,6 +555,15 @@ const shortDate = (date: string | undefined) => {
   return date ? date.split(" ")[1] || date : "";
 };
 
+const agentLabel = (agent: string | null | undefined) => {
+  if (!agent) return "Unknown";
+  if (agent.includes("Mobile") || agent.includes("Android") || agent.includes("iPhone")) return "Mobile";
+  if (agent.includes("Chrome")) return "Chrome";
+  if (agent.includes("Firefox")) return "Firefox";
+  if (agent.includes("Safari")) return "Safari";
+  return "Desktop / Other";
+};
+
 const getActivityDot = (type: string) => {
   const colors = {
     post: "bg-sky-500",
@@ -465,15 +571,6 @@ const getActivityDot = (type: string) => {
     contact: "bg-amber-500",
   };
   return colors[type as keyof typeof colors] || "bg-slate-400";
-};
-
-const getTypeColor = (type: string) => {
-  const colors = {
-    post: "bg-sky-50 text-sky-700",
-    project: "bg-emerald-50 text-emerald-700",
-    contact: "bg-amber-50 text-amber-700",
-  };
-  return colors[type as keyof typeof colors] || "bg-slate-100 text-slate-700";
 };
 
 const getStatusColor = (status: string) => {
@@ -496,6 +593,14 @@ const formatDate = (date: string) => {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  });
+};
+
+const formatShortDate = (date: string) => {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 };
 </script>

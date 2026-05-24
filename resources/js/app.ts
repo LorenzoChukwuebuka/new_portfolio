@@ -70,16 +70,18 @@ const router = createRouter({
 
 
 // Navigation guards
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
     const isAuthenticated = api.isAuthenticated();
 
     if (to.meta.requiresAuth && !isAuthenticated) {
-        next('/admin/login');
-    } else if (to.meta.requiresGuest && isAuthenticated) {
-        next('/admin/dashboard');
-    } else {
-        next();
+        return '/admin/login';
     }
+
+    if (to.meta.requiresGuest && isAuthenticated) {
+        return '/admin/dashboard';
+    }
+
+    return true;
 });
 
 // Update document title
