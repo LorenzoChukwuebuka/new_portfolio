@@ -18,7 +18,7 @@ Production still needs the SEO release: the last checked /sitemap.xml response w
 
 ### Endpoint and original failure
 
-- Litehost Developer Tools show the SSH command uses port 22 and username lorenzc1 at server IPv4 51.161.208.192.
+- Litehost Developer Tools show the SSH command uses port 22 and username lorenzoc1 at server IPv4 51.161.208.192.
 - GitHub runner diagnostic run 39468207904 confirmed port 22 connected and port 428 timed out. The old deployment workflow used port 22 for ssh-keyscan but hard-coded port 428 for later SSH and rsync operations.
 - Failed deploy run 39463191375 stopped at ssh-keyscan on port 22 with exit code 1. Its log did not show a more specific network or key-scan diagnostic. The later port check confirms port 428 was wrong, but it does not prove why the earlier port-22 key scan failed.
 - The old workflow also referenced CPANEL_SSH_PUBLIC_KEY while the configured secret name was CPANEL_PUBLIC_KEY.
@@ -26,10 +26,10 @@ Production still needs the SEO release: the last checked /sitemap.xml response w
 ### Authorized client key and host key
 
 - The user-generated ECDSA key is present in Litehost's .ssh/authorized_keys. Its public fingerprint matched the original GitHub Actions key pair fingerprint, SHA256:vJlGLZmmHmW3J9K/oNnM8beYG1rD3APN0AD+jMUOL2A.
-- CPANEL_SSH_SECRET and CPANEL_PUBLIC_KEY have been restored to that same cPanel-generated key pair. A bounded SSH test from this machine authenticated successfully using that key and a harmless remote true command.
+- CPANEL_SSH_SECRET and CPANEL_PUBLIC_KEY have been restored to that same cPanel-generated key pair. Bounded SSH tests from this machine and a GitHub-hosted runner authenticated successfully using that key and a harmless remote true command. The hosted-runner test also validated the current Actions key pair and host pin.
 - The live ECDSA server key fingerprint, SHA256:CTMMXPiJYWJrCgvkesej9heiQn3cjgN+6cpIiBIr584, matched the existing ECDSA host-key entry in the authenticated cPanel account's .ssh/known_hosts file. The entry was checked for the Litehost server address before being used as the trust pin.
 - CPANEL_KNOWN_HOSTS is configured with that verified known-host entry. StrictHostKeyChecking=yes was used during the direct SSH test. The support ticket is no longer part of this process; the account owner deleted it, and the authenticated cPanel host-key record supplied the trust anchor instead.
-- GitHub Actions secret plaintext cannot be retrieved through GitHub. Metadata confirms the expected names exist: SERVER_IP, CPANEL_USER, CPANEL_SSH_SECRET, CPANEL_PUBLIC_KEY, and CPANEL_KNOWN_HOSTS. Masked prior checks matched the Litehost username and server address. No private key or token was printed in logs.
+- GitHub Actions secret plaintext cannot be retrieved through GitHub. Metadata confirms the expected names exist: SERVER_IP, CPANEL_USER, CPANEL_SSH_SECRET, CPANEL_PUBLIC_KEY, and CPANEL_KNOWN_HOSTS. Masked checks matched the Litehost username and server address; hosted-runner run 39477873674 passed key-pair, endpoint, strict host-key, and authentication checks without printing secret values. No private key or token was printed in logs.
 - The temporary private-key downloads used for SSH verification were removed securely after each test. The extra ED25519 key generated during the earlier investigation is not used for deployment.
 
 ## Verified Litehost layout
@@ -63,12 +63,15 @@ The readiness branch's workflow_dispatch path is intended for an SSH preflight o
 
 ## Verification and limitations
 
-- Direct SSH authentication succeeded with strict host-key verification; remote command was true.
+- GitHub-hosted SSH preflight run 39477873674 passed. It checked the Actions key pair and trusted host entry, reached port 22, verified the host key strictly, and authenticated with a remote true command. The temporary probe branch was deleted and its workflow disabled after the run.
+- The read-only rsync list-only check over strict SSH succeeded and listed the five existing release directories. It did not upload or modify files.
 - Live home, shared paths, current release, literal public symlink, resolved targets, and rewrite were verified read-only over SSH.
-- GitHub runner diagnostics confirmed TCP port 22 connectivity and port 428 timeout. A hosted-runner SSH authentication check using the current restored secrets is still pending.
-- The deployment branch is not main and has not triggered production deployment.
-- Earlier checks passed for workflow YAML parsing, embedded bash syntax, Composer production install/platform requirements, the Composer test suite, Vite production build, and an rsync dry-run. The workflow was further tightened after those checks; the syntax checks will be rerun against the final file before handoff.
-- actionlint is not installed locally. The public site endpoints have not been rechecked after deployment because no deployment was performed.
+- Final workflow YAML parsing and bash -n passed for all six embedded run steps. git diff --check passed.
+- Composer production dependency installation and composer check-platform-reqs --no-dev passed. The Composer test suite passed: 13 tests and 81 assertions. Tests used only .env.example in the temporary clone and an ephemeral test APP_KEY; that ignored .env file was removed afterward.
+- npm ci --force and npm run build passed. npm audit reported 22 advisories (1 low, 4 moderate, 15 high, 2 critical); dependency upgrades were outside this deployment repair and were not applied.
+- actionlint is not installed locally. GitHub runner execution validated the secret-backed SSH behavior instead.
+- The deployment branch is not main and has not triggered production deployment. The production endpoints have not been checked after deployment because no deployment was performed.
+- GitHub retains historical run records for the previous diagnostic attempts. The two obsolete diagnostic workflows and the temporary authentication probe were disabled; only the actual deployment workflow remains active.
 
 ## Remaining action
 
