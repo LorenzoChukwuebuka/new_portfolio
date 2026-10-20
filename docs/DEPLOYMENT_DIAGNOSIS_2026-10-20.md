@@ -26,6 +26,10 @@ The authenticated File Manager reconfirmed `/public_html/.htaccess` (306 bytes) 
 
 During the follow-up, Litehost's reverse DNS for the server resolved to `srv3.getlitehost.net`, but DNS returned no SSHFP record for that name. Litehost's published SSH guide does not publish a host-key fingerprint. The local public key was checked against the GitHub deployment-key fingerprint and proved to be a different key, so it was not installed.
 
+On 2026-10-20, I repeated the endpoint check from the local environment: TCP to `51.161.208.192:22` connected, while TCP to port `428` timed out. `ssh-keyscan` observed ED25519 fingerprint `SHA256:amQObvd5PHlPWuDsmKuW/Q6HVSJ8Ajt7TNiu6eGBScY` and RSA fingerprint `SHA256:Jsq6+z9r4lu4OX3YZY+Vsa3VEUcrHxy8sOcgJTmCtSs`. These are untrusted network observations only; neither was added to GitHub or accepted as Litehost's identity.
+
+The host fingerprint is required for the configured strict SSH check because the deployment key and the host key prove opposite sides of the connection: the deployment key proves the runner is authorized to log in, while the pinned host key proves the runner reached the intended Litehost server. The pin remains pending Litehost's authenticated confirmation.
+
 A temporary, branch-scoped GitHub Actions diagnostic ([run 39472203811](https://github.com/LorenzoChukwuebuka/new_portfolio/actions/runs/39472203811)) derived the original public key from the GitHub private-key secret, checked it against `CPANEL_PUBLIC_KEY`, and logged only its fingerprint `SHA256:vJlGLZmmHmW3J9K/oNnM8beYG1rD3APN0AD+jMUOL2A`. The check passed, proving the original GitHub secrets matched. That fingerprint did not match the only local `.pub` key (`id_ed25519.pub`), and no other local public keys were present. The temporary diagnostic branch was deleted after the result was collected; it made no deployment changes.
 
 Because the matching public half of the original key was unavailable locally, I generated a dedicated ED25519 deployment pair and replaced only this repository's `CPANEL_SSH_SECRET` and `CPANEL_PUBLIC_KEY` Actions secrets. The pair was derived and compared locally before upload. The new public fingerprint is `SHA256:Ic9AjqcFiCiXruA5fEc7JrkpN0nwuQYov6pHO5LqD/A`; its public half is saved for owner handoff at `/tmp/new_portfolio_litehost_deploy_key.pub`. The temporary private-key file was removed after the secret update. The new public key has not been authorized in Litehost, so the hosting account still cannot accept this key yet.
@@ -73,4 +77,4 @@ Then run the workflow's SSH preflight and candidate deployment only after review
 
 ## Preserved local work
 
-The existing untracked `.aws` file was not inspected, modified, or removed. The tracked workflow and documentation edits remain local and uncommitted.
+The existing untracked `.aws` file was not inspected, modified, copied, or removed. The original workspace still has local tracked edits and the untracked diagnosis document because its `.git` mount is read-only. A writable clone was used to publish the reviewed workflow and documentation to `codex/litehost-deploy-readiness-20261020` (commit `79b9a6b`, with a follow-up documentation commit pending). This branch does not trigger the production workflow. No push to `main` or production deployment was performed.
