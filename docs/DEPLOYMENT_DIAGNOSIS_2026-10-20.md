@@ -77,4 +77,4 @@ Then run the workflow's SSH preflight and candidate deployment only after review
 
 ## Preserved local work
 
-The existing untracked `.aws` file was not inspected, modified, copied, or removed. The original workspace still has local tracked edits and the untracked diagnosis document because its `.git` mount is read-only. A writable clone was used to publish the reviewed workflow and documentation to `codex/litehost-deploy-readiness-20261020` (commit `79b9a6b`, with a follow-up documentation commit pending). This branch does not trigger the production workflow. No push to `main` or production deployment was performed.
+The existing untracked `.aws` file was not inspected, modified, copied, or removed. The original workspace still has local tracked edits and the untracked diagnosis document because its `.git` mount is read-only. A writable clone was used to publish the reviewed workflow and documentation to `codex/litehost-deploy-readiness-20261020` (workflow commit `79b9a6b`, latest diagnosis update `206f5d1`). This branch does not trigger the production workflow. No push to `main` or production deployment was performed.
