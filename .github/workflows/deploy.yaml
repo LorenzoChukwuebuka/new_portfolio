@@ -1,8 +1,16 @@
 name: Deploy Laravel + Vue (cPanel)
+
 on:
   push:
     branches:
       - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litehost-production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -32,23 +40,130 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --no-dev --optimize-autoloader
 
-      # Setup SSH on the runner
-      - name: Setup SSH
+      # SSH host keys must be verified out of band and stored in CPANEL_KNOWN_HOSTS.
+      - name: Setup and Verify SSH
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_SSH_SECRET: ${{ secrets.CPANEL_SSH_SECRET }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+          SSH_PORT: "428"
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.CPANEL_SSH_SECRET }}" > ~/.ssh/id_ecdsa
-          echo "${{ secrets.CPANEL_SSH_PUBLIC_KEY }}" > ~/.ssh/id_ecdsa.pub
-          chmod 600 ~/.ssh/id_ecdsa
-          chmod 600 ~/.ssh/id_ecdsa.pub
-          ssh-keyscan -H -p 428 ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+          set -euo pipefail
 
-      # Push to a timestamped release folder
+          for secret_name in SERVER_IP CPANEL_USER CPANEL_SSH_SECRET; do
+            if [[ -z "${!secret_name:-}" ]]; then
+              echo "::error::Required GitHub Actions secret ${secret_name} is empty or missing."
+              exit 1
+            fi
+          done
+
+          if [[ ! "$SERVER_IP" =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]]; then
+            echo "::error::SERVER_IP must contain only a hostname or IP address; its value was not logged."
+            exit 1
+          fi
+
+          if [[ ! "$CPANEL_USER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::CPANEL_USER has an unsupported format; its value was not logged."
+            exit 1
+          fi
+
+          # Separate DNS and TCP reachability checks from SSH key and authentication errors.
+          python3 - <<'PY'
+          import os
+          import socket
+          import sys
+
+          host = os.environ["SERVER_IP"]
+          port = int(os.environ["SSH_PORT"])
+          try:
+              addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+          except socket.gaierror:
+              print("::error::DNS lookup failed for SERVER_IP. Verify the GitHub Actions secret value and Litehost hostname configuration.")
+              sys.exit(1)
+
+          last_error = None
+          for family, socktype, proto, _, address in addresses:
+              try:
+                  with socket.socket(family, socktype, proto) as connection:
+                      connection.settimeout(8)
+                      connection.connect(address)
+                  print("TCP connection to the configured SSH endpoint on port 428 succeeded.")
+                  sys.exit(0)
+              except OSError as error:
+                  last_error = error
+
+          error_type = type(last_error).__name__ if last_error else "unknown socket error"
+          print(f"::error::Could not connect to the configured SSH endpoint on port 428 ({error_type}). Check the Litehost SSH service/port and any runner IP allowlist or firewall.")
+          sys.exit(1)
+          PY
+
+          if [[ -z "${CPANEL_KNOWN_HOSTS:-}" ]]; then
+            echo "::error::TCP port 428 is reachable, but CPANEL_KNOWN_HOSTS is empty or missing. Store Litehost's independently verified SSH host key before enabling deployment."
+            exit 1
+          fi
+
+          install -d -m 700 "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          if ! ssh-keygen -F "[$SERVER_IP]:$SSH_PORT" -f "$HOME/.ssh/known_hosts" >/dev/null 2>&1; then
+            echo "::error::CPANEL_KNOWN_HOSTS has no host key entry matching SERVER_IP on port 428. Store the independently verified Litehost SSH host key for [host]:428."
+            exit 1
+          fi
+
+          printf '%s\n' "$CPANEL_SSH_SECRET" > "$HOME/.ssh/id_deploy"
+          chmod 600 "$HOME/.ssh/id_deploy"
+          if ! ssh-keygen -y -P '' -f "$HOME/.ssh/id_deploy" >/dev/null 2>&1; then
+            echo "::error::CPANEL_SSH_SECRET is not a readable, unencrypted SSH private key. Replace it with the intended private key; no key data was logged."
+            exit 1
+          fi
+
+          SSH_OPTIONS=(
+            -i "$HOME/.ssh/id_deploy"
+            -p "$SSH_PORT"
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o IdentitiesOnly=yes
+            -o PreferredAuthentications=publickey
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+
+          ssh_output="$(mktemp)"
+          ssh_error="$(mktemp)"
+          if ! ssh "${SSH_OPTIONS[@]}" "$CPANEL_USER@$SERVER_IP" true >"$ssh_output" 2>"$ssh_error"; then
+            if grep -Eqi 'REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed|No .* host key is known' "$ssh_error"; then
+              echo "::error::SSH host-key verification failed. Confirm CPANEL_KNOWN_HOSTS matches Litehost's current SSH host key on port 428."
+            elif grep -Eqi 'Permission denied|No more authentication methods' "$ssh_error"; then
+              echo "::error::The private key is valid, but Litehost rejected public-key authentication. Check CPANEL_USER and authorize the matching public key for that cPanel account."
+            elif grep -Eqi 'Could not resolve hostname|Connection timed out|Connection refused|No route to host|Operation timed out' "$ssh_error"; then
+              echo "::error::SSH could not establish a connection after the TCP preflight. Recheck Litehost SSH availability and network allowlisting."
+            else
+              echo "::error::SSH preflight failed for an unclassified reason. Raw SSH diagnostics were suppressed; review the endpoint and Litehost SSH configuration."
+            fi
+            rm -f "$ssh_output" "$ssh_error"
+            exit 1
+          fi
+          rm -f "$ssh_output" "$ssh_error"
+          echo "SSH host-key verification and public-key authentication succeeded."
+
+      # Push a complete, timestamped release folder to the cPanel account.
       - name: Deploy Files to Server
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: "428"
         run: |
-          RELEASE=$(date +%Y-%m-%d_%H-%M-%S)
-          echo "RELEASE=$RELEASE" >> $GITHUB_ENV
+          set -euo pipefail
+
+          RELEASE="$(date -u +%Y%m%d%H%M%S)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
+
           rsync -avz \
-            -e "ssh -i ~/.ssh/id_ecdsa -p 428 -o StrictHostKeyChecking=no" \
+            -e "ssh -i $HOME/.ssh/id_deploy -p $SSH_PORT -o BatchMode=yes -o ConnectTimeout=10 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o GlobalKnownHostsFile=/dev/null" \
+            --rsync-path="mkdir -p /home/$CPANEL_USER/production/releases/$RELEASE && rsync" \
             --exclude='.git' \
             --exclude='.env' \
             --exclude='node_modules' \
@@ -56,34 +171,90 @@ jobs:
             --exclude='.github' \
             --exclude='storage' \
             ./ \
-            ${{ secrets.CPANEL_USER }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.CPANEL_USER }}/production/releases/$RELEASE/
+            "$CPANEL_USER@$SERVER_IP:/home/$CPANEL_USER/production/releases/$RELEASE/"
 
-      # Activate release and run Laravel commands
-      - name: Activate Release & Run Laravel Commands
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.CPANEL_USER }}
-          key: ${{ secrets.CPANEL_SSH_SECRET }}
-          port: 428
-          script: |
-            BASE=/home/${{ secrets.CPANEL_USER }}/production
-            RELEASE=${{ env.RELEASE }}
+      # Prepare and verify the candidate release before atomically switching current.
+      - name: Prepare and Activate Release
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: "428"
+        run: |
+          set -euo pipefail
 
-            # Link shared .env and storage into the new release
-            ln -sf $BASE/shared/.env $BASE/releases/$RELEASE/.env
-            ln -sf $BASE/shared/storage $BASE/releases/$RELEASE/storage
+          REMOTE_BASE="/home/$CPANEL_USER/production"
+          ssh \
+            -i "$HOME/.ssh/id_deploy" \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null \
+            "$CPANEL_USER@$SERVER_IP" bash -s -- "$REMOTE_BASE" "$RELEASE" <<'REMOTE_SCRIPT'
+          set -Eeuo pipefail
 
-            # Point current symlink to new release
-            ln -sfn $BASE/releases/$RELEASE $BASE/current
+          BASE="$1"
+          RELEASE="$2"
+          RELEASE_DIR="$BASE/releases/$RELEASE"
+          PHASE="release preparation"
+          trap 'status=$?; printf "Deployment failed during %s for candidate %s (exit %s). The previous current target remains active unless atomic activation had completed.\n" "$PHASE" "$RELEASE" "$status" >&2; exit "$status"' ERR
 
-            # Run Laravel commands
-            cd $BASE/current
-            php artisan migrate --force
-            php artisan config:cache
-            php artisan storage:link
-            php artisan route:cache
-            php artisan view:cache
+          if [[ ! "$BASE" =~ ^/home/[A-Za-z0-9._-]+/production$ || ! "$RELEASE" =~ ^[0-9]{14}-[0-9]+-[0-9]+$ ]]; then
+            echo "Invalid deployment path arguments." >&2
+            exit 1
+          fi
 
-            # Keep only last 5 releases, delete older ones
-            ls -dt $BASE/releases/*/ | tail -n +6 | xargs rm -rf
+          if [[ ! -f "$BASE/shared/.env" || ! -d "$BASE/shared/storage" ]]; then
+            echo "Litehost setup is incomplete: expected shared/.env and shared/storage under the production directory." >&2
+            exit 1
+          fi
+
+          if [[ ! -d "$RELEASE_DIR" || ! -f "$RELEASE_DIR/artisan" || ! -f "$RELEASE_DIR/vendor/autoload.php" || ! -f "$RELEASE_DIR/public/build/manifest.json" ]]; then
+            echo "Uploaded release is incomplete; artisan, vendor/autoload.php, or public/build/manifest.json is missing." >&2
+            exit 1
+          fi
+
+          ln -s "$BASE/shared/.env" "$RELEASE_DIR/.env"
+          ln -s "$BASE/shared/storage" "$RELEASE_DIR/storage"
+
+          cd "$RELEASE_DIR"
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan storage:link
+          php artisan route:cache
+          php artisan view:cache
+
+          PHASE="atomic release activation"
+          CURRENT="$BASE/current"
+          if [[ -e "$CURRENT" && ! -L "$CURRENT" ]]; then
+            echo "Refusing to replace production/current because it exists and is not a symlink." >&2
+            exit 1
+          fi
+
+          NEXT_LINK="$BASE/.current-$RELEASE"
+          ln -s "$RELEASE_DIR" "$NEXT_LINK"
+          if ! mv -Tf "$NEXT_LINK" "$CURRENT"; then
+            rm -f "$NEXT_LINK"
+            echo "Could not atomically switch production/current; the prior target was left in place." >&2
+            exit 1
+          fi
+
+          # Prune only after activation. A cleanup problem must not undo a live release.
+          PHASE="old-release cleanup"
+          CURRENT_TARGET="$(readlink "$CURRENT" || true)"
+          CURRENT_NAME="${CURRENT_TARGET##*/}"
+          mapfile -t RELEASES < <(find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | LC_ALL=C sort -r)
+          COUNT=0
+          for OLD_RELEASE in "${RELEASES[@]}"; do
+            COUNT=$((COUNT + 1))
+            if (( COUNT > 5 )) && [[ "$OLD_RELEASE" != "$CURRENT_NAME" ]]; then
+              if ! rm -rf -- "$BASE/releases/$OLD_RELEASE"; then
+                echo "Warning: could not remove an old release; current is active and deployment remains successful." >&2
+              fi
+            fi
+          done
+
+          echo "Activated release $RELEASE."
+          REMOTE_SCRIPT
