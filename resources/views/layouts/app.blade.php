@@ -6,7 +6,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Software Engineer in Nigeria | Laravel & Go SaaS Developer – Lorenzo Chukwuebuka Obi')</title>
+    @php
+        $defaultTitle = 'Lorenzo Chukwuebuka Obi | Laravel and Go Software Engineer';
+        $defaultDescription = 'Software engineer in Nigeria building Laravel, Go, payment, dashboard, and SaaS systems.';
+        $seoTitle = $__env->yieldContent('title', $defaultTitle);
+        $seoDescription = $__env->yieldContent('meta_description', $defaultDescription);
+        $seoCanonical = $__env->yieldContent(
+            'canonical',
+            app(\App\Support\Seo\CanonicalUrl::class)->forPath(request()->getPathInfo()),
+        );
+        $seoImage = $__env->yieldContent(
+            'og_image',
+            app(\App\Support\Seo\CanonicalUrl::class)->forPath('/storage/images/profile.jpg'),
+        );
+        $seoRobots = app()->environment('production')
+            ? $__env->yieldContent('robots', 'index, follow')
+            : 'noindex, nofollow';
+        $personSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Person',
+            'name' => 'Lorenzo Chukwuebuka Obi',
+            'url' => app(\App\Support\Seo\CanonicalUrl::class)->forPath('/'),
+            'sameAs' => [
+                'https://github.com/LorenzoChukwuebuka',
+                'https://www.linkedin.com/in/lawrence-chukwuebuka-obi-4375b5191/',
+            ],
+        ];
+        $websiteSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => 'Lorenzo Chukwuebuka Obi',
+            'url' => app(\App\Support\Seo\CanonicalUrl::class)->forPath('/'),
+            'inLanguage' => str_replace('_', '-', app()->getLocale()),
+        ];
+    @endphp
+
+    <title>{{ $seoTitle }}</title>
 
     <link rel="icon" href="{{ asset('/storage/images/profile.jpg') }}" type="image/png">
 
@@ -14,42 +49,34 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <meta name="description" content="@yield('meta_description', 'Experienced Software Engineer in Nigeria specializing in Laravel, Golang, SaaS architecture, multi-tenant systems, and payment integrations. Helping startups build scalable backend systems.')">
-    <meta name="keywords" content="@yield(
-        'meta_keywords',
-        'Laravel Developer Nigeria,
-            Backend Developer Nigeria,
-            SaaS Developer Nigeria,
-            Software Engineer in Lagos,
-            Golang Developer Nigeria,
-            Multi-tenant SaaS Developer,
-            Payment Integration Developer Nigeria,
-            Fintech Software Developer Nigeria,
-            Custom Software Development Nigeria,
-            Hire Laravel Developer Lagos'
-    )">
-    <link rel="canonical" href="@yield('canonical', url()->current())">
+    <meta name="description" content="{{ $seoDescription }}">
+    <meta name="author" content="{{ $__env->yieldContent('author', 'Lorenzo Chukwuebuka Obi') }}">
+    <link rel="canonical" href="{{ $seoCanonical }}">
 
     {{-- OpenGraph (Facebook, LinkedIn, WhatsApp, etc.) --}}
-    <meta property="og:type" content="@yield('og_type', 'website')">
-    <meta property="og:title" content="@yield('og_title', 'Lorenzo Chukwuebuka Obi - Portfolio')">
-    <meta property="og:description" content="@yield('og_description', 'Software Engineer Portfolio')">
-    <meta property="og:image" content="@yield('og_image', asset('/storage/images/profile.jpg'))">
-    <meta property="og:url" content="@yield('og_url', url()->current())">
+    <meta property="og:type" content="{{ $__env->yieldContent('og_type', 'website') }}">
+    <meta property="og:title" content="{{ $__env->yieldContent('og_title', $seoTitle) }}">
+    <meta property="og:description" content="{{ $__env->yieldContent('og_description', $seoDescription) }}">
+    <meta property="og:image" content="{{ $seoImage }}">
+    <meta property="og:url" content="{{ $__env->yieldContent('og_url', $seoCanonical) }}">
     <meta property="og:site_name" content="Lorenzo Chukwuebuka Obi">
     <meta property="og:locale" content="en_US">
 
     {{-- Twitter Card --}}
-    <meta name="twitter:card" content="@yield('twitter_card', 'summary_large_image')">
-    <meta name="twitter:title" content="@yield('twitter_title', 'Lorenzo Chukwuebuka Obi - Portfolio')">
-    <meta name="twitter:description" content="@yield('twitter_description', 'Software Engineer Portfolio')">
-    <meta name="twitter:image" content="@yield('twitter_image', asset('/storage/images/profile.jpg'))">
-    <meta name="twitter:url" content="@yield('twitter_url', url()->current())">
+    <meta name="twitter:card" content="{{ $__env->yieldContent('twitter_card', 'summary_large_image') }}">
+    <meta name="twitter:title" content="{{ $__env->yieldContent('twitter_title', $seoTitle) }}">
+    <meta name="twitter:description" content="{{ $__env->yieldContent('twitter_description', $seoDescription) }}">
+    <meta name="twitter:image" content="{{ $__env->yieldContent('twitter_image', $seoImage) }}">
+    <meta name="twitter:url" content="{{ $__env->yieldContent('twitter_url', $seoCanonical) }}">
 
-    <meta name="robots" content="index, follow">
-    <meta name="googlebot" content="index, follow">
+    <meta name="robots" content="{{ $seoRobots }}">
+    <meta name="googlebot" content="{{ $seoRobots }}">
 
     @stack('head')
+
+    <script type="application/ld+json">@json($personSchema, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)</script>
+    <script type="application/ld+json">@json($websiteSchema, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)</script>
+    @stack('structured-data')
 
 
     <!-- Styles -->

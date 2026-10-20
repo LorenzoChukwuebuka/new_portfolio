@@ -1,16 +1,3 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import Dashboard from './views/Dashboard.vue';
-import Categories from './views/Categories.vue';
-import Posts from './views/Posts.vue';
-import PostForm from './views/PostForm.vue';
-import Projects from './views/Projects.vue';
-import ProjectForm from './views/ProjectForm.vue';
-import Login from './views/Login.vue';
-import Tags from './views/Tags.vue';
-import CV from './views/CV.vue';
-import Contacts from './views/Contacts.vue';
-import Comments from './views/Comments.vue';
-
 const routes = [
     {
         path: '/admin',
@@ -19,79 +6,79 @@ const routes = [
     {
         path: '/admin/dashboard',
         name: 'Dashboard',
-        component: Dashboard,
+        component: () => import('./views/Dashboard.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: "/admin/login",
         name: 'Login',
-        component: Login,
+        component: () => import('./views/Login.vue'),
         meta: { requiresGuest: true },
     },
     {
         path: '/admin/categories',
         name: 'Categories',
-        component: Categories,
+        component: () => import('./views/Categories.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: '/admin/posts',
         name: 'Posts',
-        component: Posts,
+        component: () => import('./views/Posts.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: '/admin/posts/create',
         name: 'CreatePost',
-        component: PostForm,
+        component: () => import('./views/PostForm.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: '/admin/posts/:slug/edit',
         name: 'EditPost',
-        component: PostForm,
+        component: () => import('./views/PostForm.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: '/admin/projects',
         name: 'Projects',
-        component: Projects,
+        component: () => import('./views/Projects.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: '/admin/projects/create',
         name: 'CreateProject',
-        component: ProjectForm,
+        component: () => import('./views/ProjectForm.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: '/admin/projects/:id/edit',
         name: 'EditProject',
-        component: ProjectForm,
+        component: () => import('./views/ProjectForm.vue'),
         meta: { requiresAuth: true },
     },
     {
         path: "/admin/tags",
         name: "tags",
-        component: Tags,
+        component: () => import('./views/Tags.vue'),
         meta: { requiresAuth: true },
     }, 
     {
         path: "/admin/cv",
         name: "cv",
-        component: CV,
+        component: () => import('./views/CV.vue'),
         meta: { requiresAuth: true },
     },
     {
         path:"/admin/contacts",
         name:"contacts",
-        component:Contacts,
+        component: () => import('./views/Contacts.vue'),
         meta: { requiresAuth: true },
     },
     {
         path:"/admin/comments",
         name:"comments",
-        component:Comments,
+        component: () => import('./views/Comments.vue'),
         meta: { requiresAuth: true },
     }
 ];

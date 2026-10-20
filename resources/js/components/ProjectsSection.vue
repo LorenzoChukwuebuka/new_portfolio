@@ -79,12 +79,18 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from "vue";
 import ProjectCard from "./ProjectCard.vue";
-import type { Project } from "./../types";
+import type { ApiProject, Project } from "./../types";
 import api from "../admin/utils/api";
 import { normalizeProject } from "../utils/helper";
 
-const projects = ref<Project[]>([]);
-const loading = ref(true);
+const props = defineProps<{
+  initialProjects?: ApiProject[];
+}>();
+
+const projects = ref<Project[]>(
+  props.initialProjects?.map(normalizeProject) ?? []
+);
+const loading = ref(!props.initialProjects);
 const error = ref(false);
 
 const fetchProjects = async () => {
@@ -100,5 +106,7 @@ const fetchProjects = async () => {
   }
 };
 
-onMounted(fetchProjects);
+onMounted(() => {
+  if (!props.initialProjects) fetchProjects();
+});
 </script>

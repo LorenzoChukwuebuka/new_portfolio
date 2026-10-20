@@ -10,6 +10,8 @@
         v-if="post.featuredUrl"
         :src="post.featuredUrl"
         :alt="post.title"
+        loading="lazy"
+        decoding="async"
         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
       />
       <span

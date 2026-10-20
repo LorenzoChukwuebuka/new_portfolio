@@ -14,8 +14,13 @@
         <span class="text-amber-400">{{ post?.slug ?? "..." }}</span>
       </nav>
 
+      <!-- Server-rendered article stays visible while Vue fetches the same post. -->
+      <div v-if="(loading || error || !post) && $slots.default">
+        <slot />
+      </div>
+
       <!-- Loading skeleton -->
-      <div v-if="loading" class="animate-pulse space-y-6">
+      <div v-else-if="loading" class="animate-pulse space-y-6">
         <div class="h-4 bg-zinc-800 rounded w-1/4" />
         <div class="h-12 bg-zinc-800 rounded w-3/4" />
         <div class="h-6 bg-zinc-800 rounded w-full" />

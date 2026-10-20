@@ -16,8 +16,13 @@
         <span class="text-amber-400">{{ project?.slug ?? "..." }}</span>
       </nav>
 
+      <!-- Server-rendered project content stays visible while Vue fetches it. -->
+      <div v-if="(loading || error || !project) && $slots.default">
+        <slot />
+      </div>
+
       <!-- Loading skeleton -->
-      <div v-if="loading" class="animate-pulse space-y-8">
+      <div v-else-if="loading" class="animate-pulse space-y-8">
         <div class="h-24 w-24 bg-zinc-800 rounded" />
         <div class="h-10 bg-zinc-800 rounded w-2/3" />
         <div class="h-5 bg-zinc-800 rounded w-full" />

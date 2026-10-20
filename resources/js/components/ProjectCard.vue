@@ -12,6 +12,8 @@
         v-if="project.thumbnailUrl"
         :src="project.thumbnailUrl"
         :alt="project.title"
+        loading="lazy"
+        decoding="async"
         class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-500"
       />
 
@@ -41,7 +43,7 @@
       <h3
         class="font-['Playfair_Display',serif] text-2xl font-bold text-zinc-100 mb-3 group-hover:text-amber-400 transition-colors duration-300"
       >
-        {{ project.title }}
+        <a :href="`/projects/${project.slug}`">{{ project.title }}</a>
       </h3>
       <p class="text-zinc-400 text-sm leading-relaxed mb-5">
         {{ project.description }}

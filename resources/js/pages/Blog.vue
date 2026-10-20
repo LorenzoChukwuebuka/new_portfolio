@@ -30,9 +30,14 @@
         </p>
       </div>
 
+      <!-- Server-rendered page content stays visible while Vue fetches data. -->
+      <div v-if="(loading || error) && $slots.default">
+        <slot />
+      </div>
+
       <!-- Loading skeleton -->
       <div
-        v-if="loading"
+        v-else-if="loading"
         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
       >
         <div
@@ -124,12 +129,20 @@ import type { BlogPost } from "../types";
 import api from "../admin/utils/api";
 import { normalizeBlogPost } from "../utils/helper";
 
-const posts = ref<BlogPost[]>([]);
-const loading = ref(true);
+const props = defineProps<{
+  initialPosts?: unknown[];
+}>();
+
+const posts = ref<BlogPost[]>(
+  props.initialPosts?.map(normalizeBlogPost) ?? []
+);
+const loading = ref(!props.initialPosts);
 const error = ref(false);
 const activeCategory = ref("All");
 
 onMounted(async () => {
+  if (props.initialPosts) return;
+
   try {
     const { data } = await api.get("/posts");
     posts.value = data.data.map(normalizeBlogPost);

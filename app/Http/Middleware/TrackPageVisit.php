@@ -18,11 +18,11 @@ class TrackPageVisit
 
         if ($this->shouldTrack($request, $response)) {
             PageVisit::create([
-                'path'       => '/' . ltrim($request->path(), '/'),
-                'method'     => $request->method(),
-                'ip_hash'    => $request->ip() ? hash('sha256', $request->ip()) : null,
+                'path' => '/'.ltrim($request->path(), '/'),
+                'method' => $request->method(),
+                'ip_hash' => $request->ip() ? hash('sha256', $request->ip()) : null,
                 'user_agent' => str($request->userAgent())->limit(500, '')->toString(),
-                'referer'    => str($request->headers->get('referer'))->limit(500, '')->toString(),
+                'referer' => str($request->headers->get('referer'))->limit(500, '')->toString(),
             ]);
         }
 
@@ -49,6 +49,7 @@ class TrackPageVisit
             'up',
             'favicon.ico',
             'robots.txt',
+            'sitemap.xml',
         ]);
     }
 }

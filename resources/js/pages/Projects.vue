@@ -14,11 +14,11 @@
           >
             Selected Work
           </p>
-          <h2
+          <h1
             class="font-['Playfair_Display',serif] text-4xl sm:text-5xl font-black text-zinc-100 leading-tight"
           >
             Projects I've Built
-          </h2>
+          </h1>
         </div>
         <!-- <a
           href="/projects"
@@ -41,8 +41,13 @@
         </a> -->
       </div>
 
+      <!-- Server-rendered page content stays visible while Vue fetches data. -->
+      <div v-if="(loading || error) && $slots.default">
+        <slot />
+      </div>
+
       <!-- Loading skeleton -->
-      <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div v-else-if="loading" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div
           v-for="n in 2"
           :key="n"
@@ -100,12 +105,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from "vue";
 import ProjectCard from "./../components/ProjectCard.vue";
-import type { Project } from "./../types";
+import type { ApiProject, Project } from "./../types";
 import api from "../admin/utils/api";
 import { normalizeProject } from "../utils/helper";
 
-const projects = ref<Project[]>([]);
-const loading = ref(true);
+const props = defineProps<{
+  initialProjects?: ApiProject[];
+}>();
+
+const projects = ref<Project[]>(
+  props.initialProjects?.map(normalizeProject) ?? []
+);
+const loading = ref(!props.initialProjects);
 const error = ref(false);
 
 const featuredProjects = computed(() =>
@@ -126,5 +137,7 @@ const fetchProjects = async () => {
   }
 };
 
-onMounted(fetchProjects);
+onMounted(() => {
+  if (!props.initialProjects) fetchProjects();
+});
 </script>

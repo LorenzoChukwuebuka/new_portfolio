@@ -111,14 +111,22 @@ import type { BlogPost } from "../types";
 import api from "../admin/utils/api";
 import { normalizeBlogPost } from "../utils/helper";
 
-const posts = ref<BlogPost[]>([]);
-const loading = ref(true);
+const props = defineProps<{
+  initialPosts?: unknown[];
+}>();
+
+const posts = ref<BlogPost[]>(
+  props.initialPosts?.map(normalizeBlogPost) ?? []
+);
+const loading = ref(!props.initialPosts);
 const error = ref(false);
 
 const latestPosts = computed(() => posts.value.slice(0, 3));
 const totalPosts = computed(() => posts.value.length);
 
 onMounted(async () => {
+  if (props.initialPosts) return;
+
   try {
     const { data } = await api.get("/posts");
     posts.value = data.data.map(normalizeBlogPost);
