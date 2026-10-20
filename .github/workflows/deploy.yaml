@@ -164,6 +164,27 @@ jobs:
           fi
           rm -f "$ssh_output" "$ssh_error"
           echo "SSH host-key verification and public-key authentication succeeded."
+          echo "Read-only Litehost release and route diagnostics:"
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s <<'READONLY_DIAGNOSTICS'
+          set -euo pipefail
+          CURRENT="$HOME/production/current"
+          if [[ -L "$CURRENT" ]]; then
+            printf 'Active release path: %s\n' "$(readlink -f -- "$CURRENT")"
+          else
+            echo "Active release path: missing symlink"
+          fi
+          echo "Public rewrite rules:"
+          if [[ -f "$HOME/public_html/.htaccess" ]]; then
+            grep -E '^[[:space:]]*Rewrite(Cond|Rule)' "$HOME/public_html/.htaccess" || true
+          else
+            echo "public_html/.htaccess is missing"
+          fi
+          if [[ -d "$CURRENT" ]]; then
+            cd "$CURRENT"
+            php artisan route:list --path=sitemap.xml -v
+            php artisan route:list --path=robots.txt -v
+          fi
+          READONLY_DIAGNOSTICS
 
       - name: Upload Candidate Release
         if: github.event_name == 'push'
@@ -331,15 +352,23 @@ jobs:
           done
 
           if (( ${#release_dirs[@]} > 0 )); then
-            mapfile -t ordered_releases < <(printf '%s\n' "${release_dirs[@]}" | LC_ALL=C sort -r)
-            for ((index = 5; index < ${#ordered_releases[@]}; index++)); do
-              old_release="${ordered_releases[$index]}"
-              if [[ "$old_release" != "$RELEASE_DIR" ]]; then
-                if ! rm -rf -- "$old_release"; then
-                  echo "Warning: could not remove an old release; the active release remains available." >&2
+            cleanup_list="$BASE/.release-cleanup-$RELEASE"
+            if printf '%s\n' "${release_dirs[@]}" | LC_ALL=C sort -r > "$cleanup_list"; then
+              index=0
+              while IFS= read -r old_release; do
+                if (( index >= 5 )) && [[ "$old_release" != "$RELEASE_DIR" ]]; then
+                  if ! rm -rf -- "$old_release"; then
+                    echo "Warning: could not remove an old release; the active release remains available." >&2
+                  fi
                 fi
-              fi
-            done
+                index=$((index + 1))
+              done < "$cleanup_list"
+            else
+              echo "Warning: could not sort old releases for cleanup; the active release remains available." >&2
+            fi
+            if ! rm -f -- "$cleanup_list"; then
+              echo "Warning: could not remove the temporary release-cleanup list." >&2
+            fi
           fi
 
           echo "Activated release $RELEASE."

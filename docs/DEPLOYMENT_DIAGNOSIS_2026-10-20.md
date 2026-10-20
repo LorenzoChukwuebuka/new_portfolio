@@ -2,9 +2,11 @@
 
 ## Current status
 
-The Litehost endpoint, authorized SSH key, trusted server host key, and live release paths have now been verified. GitHub Actions secret names are configured, and the deployment branch contains the corrected workflow. No production deployment has been attempted.
+The Litehost endpoint, authorized SSH key, trusted server host key, and release paths have been verified. The readiness branch was fast-forwarded to main at 6e97047 and pushed with the user's approval, triggering production run 39478805887.
 
-Production still needs the SEO release: the last checked /sitemap.xml response was HTTP 200 with HTML rather than XML. That check was made before deployment and does not establish whether the new sitemap route works.
+The run passed Node and Composer installation, the frontend build, strict SSH verification, candidate upload, migrations, and Laravel cache preparation. It then failed in old-release cleanup at `mapfile` process substitution because Litehost's remote shell does not provide `/dev/fd/63`. The workflow performs the atomic `production/current` switch before cleanup. Litehost File Manager shows `production/current` modified at 19:55 on 2026-10-20, consistent with the switch, so the new release may already be active despite the failed workflow status. A read-only remote target check is being added to the next run to confirm the exact active release.
+
+After that run, the home page returned HTTP 200 HTML as expected. `/sitemap.xml` and `/robots.txt` both returned HTTP 200 HTML containing the Admin app shell, not XML or plain text. This is a confirmed live routing problem. The repository has explicit Laravel routes and controllers for both endpoints; the next workflow run now prints the active release, the server's rewrite directives, and Laravel's cached route entries to distinguish the hosting rewrite from a stale or mismatched release.
 
 ## Git diagnosis
 
@@ -45,9 +47,9 @@ A read-only SSH session verified the following without opening the environment f
 
 The existing document root and symlink were preserved. The deployment workflow does not edit either one.
 
-## Workflow changes on the readiness branch
+## Workflow changes on main
 
-The deployment workflow now:
+The deployment workflow on main:
 
 - Uses port 22 consistently for preflight, SSH, and rsync, with an optional CPANEL_SSH_PORT repository variable.
 - Uses CPANEL_PUBLIC_KEY, checks that the configured public/private keys match, and requires CPANEL_KNOWN_HOSTS.
@@ -56,7 +58,8 @@ The deployment workflow now:
 - Builds a unique candidate release, excludes shared .env and storage from rsync, and validates candidate artifacts.
 - Verifies the existing domain symlink resolves through production/current/public and that its literal target continues to follow current. A direct link to a fixed old release is rejected.
 - Links the shared .env and storage into the candidate, then runs migrations and Laravel cache/storage commands before switching current atomically.
-- Leaves the current release untouched if candidate validation, migrations, or cache preparation fail. It retains old releases until activation; old-release cleanup failure is a warning.
+- Leaves the current release untouched if candidate validation, migrations, or cache preparation fail. It retains old releases until activation; cleanup is best-effort and cannot turn a completed activation into a failed deployment.
+- Prints read-only Litehost diagnostics for the active release path, rewrite rules, and cached sitemap and robots routes without printing secret values.
 - Does not automatically reverse database migrations. Production schema changes should remain compatible with the current release in case a later preparation step fails.
 
 The readiness branch's workflow_dispatch path is intended for an SSH preflight only once the workflow is on the default branch; upload and activation steps run only on a push to main.
@@ -66,13 +69,15 @@ The readiness branch's workflow_dispatch path is intended for an SSH preflight o
 - GitHub-hosted SSH preflight run 39477873674 passed. It checked the Actions key pair and trusted host entry, reached port 22, verified the host key strictly, and authenticated with a remote true command. The temporary probe branch was deleted and its workflow disabled after the run.
 - The read-only rsync list-only check over strict SSH succeeded and listed the five existing release directories. It did not upload or modify files.
 - Live home, shared paths, current release, literal public symlink, resolved targets, and rewrite were verified read-only over SSH.
-- Final workflow YAML parsing and bash -n passed for all six embedded run steps. git diff --check passed.
+- Before the first production push, workflow YAML parsing and bash -n passed for all six embedded run steps, and git diff --check passed. The cleanup portability correction also passes YAML parsing and bash -n locally.
+- Production run 39478805887 confirms runner dependencies, frontend build, SSH, upload, migrations, and cache preparation succeeded. It failed only after the activation command, during cleanup. The exact failure was `bash: line 96: /dev/fd/63: No such file or directory`.
+- The current public responses are `/` 200 HTML, `/sitemap.xml` 200 HTML with the Admin page title, and `/robots.txt` 200 HTML with the Admin page title. The latter two do not meet the expected content types and remain unresolved.
 - Composer production dependency installation and composer check-platform-reqs --no-dev passed. The Composer test suite passed: 13 tests and 81 assertions. Tests used only .env.example in the temporary clone and an ephemeral test APP_KEY; that ignored .env file was removed afterward.
 - npm ci --force and npm run build passed. npm audit reported 22 advisories (1 low, 4 moderate, 15 high, 2 critical); dependency upgrades were outside this deployment repair and were not applied.
 - actionlint is not installed locally. GitHub runner execution validated the secret-backed SSH behavior instead.
-- The deployment branch is not main and has not triggered production deployment. The production endpoints have not been checked after deployment because no deployment was performed.
+- `main` is now at 6e97047. The first production workflow was triggered by the approved push and failed after the release activation step. Live endpoint checks were performed afterward; the sitemap and robots responses are still incorrect.
 - GitHub retains historical run records for the previous diagnostic attempts. The two obsolete diagnostic workflows and the temporary authentication probe were disabled; only the actual deployment workflow remains active.
 
 ## Remaining action
 
-All Litehost-side key authorization, host-key pinning, endpoint, and path checks are complete. The only production gate is explicit approval to update main, which triggers the production workflow. The new readiness branch is available for review; no production push or deployment has occurred.
+The cleanup failure has been corrected in the working copy and the workflow now logs the read-only information needed to resolve the live sitemap/robots routing issue. The next approved main push will rerun deployment and reveal whether Apache's rewrite rules or Laravel's active route cache is responsible. Production is not fully verified until the sitemap returns XML, robots returns plain text, and the home page remains healthy.
