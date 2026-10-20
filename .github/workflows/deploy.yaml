@@ -266,6 +266,18 @@ jobs:
             exit 1
           fi
 
+          CURRENT_TARGET="$(readlink -f -- "$CURRENT" || true)"
+          if [[ -z "$CURRENT_TARGET" || "$CURRENT_TARGET" != "$BASE"/releases/* ]]; then
+            echo "Production/current must resolve to a release under production/releases; refusing deployment." >&2
+            exit 1
+          fi
+
+          PUBLIC_LINK_LITERAL="$(readlink -- "$PUBLIC_LINK" || true)"
+          if [[ "$PUBLIC_LINK_LITERAL" != *production/current/public ]]; then
+            echo "Litehost public_html/public must keep following production/current/public; refusing to change the existing web-root symlink." >&2
+            exit 1
+          fi
+
           PUBLIC_TARGET="$(readlink -f -- "$PUBLIC_LINK" || true)"
           CURRENT_PUBLIC_TARGET="$(readlink -f -- "$CURRENT/public" || true)"
           if [[ -z "$PUBLIC_TARGET" || -z "$CURRENT_PUBLIC_TARGET" || "$PUBLIC_TARGET" != "$CURRENT_PUBLIC_TARGET" ]]; then
