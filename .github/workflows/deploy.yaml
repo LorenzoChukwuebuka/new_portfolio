@@ -47,7 +47,7 @@ jobs:
           CPANEL_USER: ${{ secrets.CPANEL_USER }}
           CPANEL_SSH_SECRET: ${{ secrets.CPANEL_SSH_SECRET }}
           CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
-          SSH_PORT: "428"
+          SSH_PORT: "22"
         run: |
           set -euo pipefail
 
@@ -88,18 +88,18 @@ jobs:
                   with socket.socket(family, socktype, proto) as connection:
                       connection.settimeout(8)
                       connection.connect(address)
-                  print("TCP connection to the configured SSH endpoint on port 428 succeeded.")
+                  print(f"TCP connection to the configured SSH endpoint on port {port} succeeded.")
                   sys.exit(0)
               except OSError as error:
                   last_error = error
 
           error_type = type(last_error).__name__ if last_error else "unknown socket error"
-          print(f"::error::Could not connect to the configured SSH endpoint on port 428 ({error_type}). Check the Litehost SSH service/port and any runner IP allowlist or firewall.")
+          print(f"::error::Could not connect to the configured SSH endpoint on port {port} ({error_type}). Check the Litehost SSH service/port and any runner IP allowlist or firewall.")
           sys.exit(1)
           PY
 
           if [[ -z "${CPANEL_KNOWN_HOSTS:-}" ]]; then
-            echo "::error::TCP port 428 is reachable, but CPANEL_KNOWN_HOSTS is empty or missing. Store Litehost's independently verified SSH host key before enabling deployment."
+            echo "::error::TCP port $SSH_PORT is reachable, but CPANEL_KNOWN_HOSTS is empty or missing. Store Litehost's independently verified SSH host key before enabling deployment."
             exit 1
           fi
 
@@ -108,7 +108,7 @@ jobs:
           printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
           if ! ssh-keygen -F "[$SERVER_IP]:$SSH_PORT" -f "$HOME/.ssh/known_hosts" >/dev/null 2>&1; then
-            echo "::error::CPANEL_KNOWN_HOSTS has no host key entry matching SERVER_IP on port 428. Store the independently verified Litehost SSH host key for [host]:428."
+            echo "::error::CPANEL_KNOWN_HOSTS has no host key entry matching SERVER_IP on port $SSH_PORT. Store the independently verified Litehost SSH host key for [host]:$SSH_PORT."
             exit 1
           fi
 
@@ -135,7 +135,7 @@ jobs:
           ssh_error="$(mktemp)"
           if ! ssh "${SSH_OPTIONS[@]}" "$CPANEL_USER@$SERVER_IP" true >"$ssh_output" 2>"$ssh_error"; then
             if grep -Eqi 'REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed|No .* host key is known' "$ssh_error"; then
-              echo "::error::SSH host-key verification failed. Confirm CPANEL_KNOWN_HOSTS matches Litehost's current SSH host key on port 428."
+              echo "::error::SSH host-key verification failed. Confirm CPANEL_KNOWN_HOSTS matches Litehost's current SSH host key on port $SSH_PORT."
             elif grep -Eqi 'Permission denied|No more authentication methods' "$ssh_error"; then
               echo "::error::The private key is valid, but Litehost rejected public-key authentication. Check CPANEL_USER and authorize the matching public key for that cPanel account."
             elif grep -Eqi 'Could not resolve hostname|Connection timed out|Connection refused|No route to host|Operation timed out' "$ssh_error"; then
@@ -154,7 +154,7 @@ jobs:
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           CPANEL_USER: ${{ secrets.CPANEL_USER }}
-          SSH_PORT: "428"
+          SSH_PORT: "22"
         run: |
           set -euo pipefail
 
@@ -178,7 +178,7 @@ jobs:
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           CPANEL_USER: ${{ secrets.CPANEL_USER }}
-          SSH_PORT: "428"
+          SSH_PORT: "22"
         run: |
           set -euo pipefail
 

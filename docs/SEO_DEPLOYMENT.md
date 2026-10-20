@@ -23,12 +23,12 @@ This application does not use Vue Router for public URLs. Public pages must have
 
 ## Shared-hosting deployment
 
-The checked-in GitHub Actions workflow builds Vite assets and installs Composer dependencies in CI, uploads a timestamped release, links the shared `.env` and storage, then runs migrations and Laravel config, route, storage, and view commands inside the candidate release. It switches `production/current` atomically only after those commands succeed. SSH uses port `428` and a pinned host key from `CPANEL_KNOWN_HOSTS`. It requires no persistent Node process, queue worker, Redis, or scheduled sitemap job.
+The checked-in GitHub Actions workflow builds Vite assets and installs Composer dependencies in CI, uploads a timestamped release, links the shared `.env` and storage, then runs migrations and Laravel config, route, storage, and view commands inside the candidate release. It switches `production/current` atomically only after those commands succeed. SSH uses port `22` and a pinned host key from `CPANEL_KNOWN_HOSTS`. It requires no persistent Node process, queue worker, Redis, or scheduled sitemap job.
 
 Before deploying:
 
 1. In the shared production `.env` (`/home/<cpanel-user>/production/shared/.env` in the workflow), set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://lorenzochukwuebuka.com.ng`, and `SEO_CANONICAL_URL=https://lorenzochukwuebuka.com.ng`.
-2. Configure the repository Actions secrets `SERVER_IP`, `CPANEL_USER`, and `CPANEL_SSH_SECRET`. Add `CPANEL_KNOWN_HOSTS` with Litehost's independently verified SSH host key entry for `[SERVER_IP]:428`. The workflow derives the public key from `CPANEL_SSH_SECRET`; it does not need a separate public-key secret.
+2. Configure the repository Actions secrets `SERVER_IP`, `CPANEL_USER`, and `CPANEL_SSH_SECRET`. Add `CPANEL_KNOWN_HOSTS` with Litehost's independently verified SSH host key entry for `[SERVER_IP]:22`. The workflow derives the public key from `CPANEL_SSH_SECRET`; it does not need a separate public-key secret.
 3. Confirm in cPanel that the domain's document root serves `production/current/public`. The repository workflow creates the `current` symlink but does not configure the cPanel document root.
 4. Confirm the hosting PHP runtime is at least 8.2 and has the extensions required by Laravel and the configured database. The workflow itself uses PHP 8.2 and Node 20 to prepare each release.
 5. Keep `public/.htaccess` enabled so clean Laravel routes work. Vite assets are built into `public/build` and shipped with the release; Composer dependencies are also shipped, so production does not need Composer or Node at request time.
