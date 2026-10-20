@@ -165,8 +165,9 @@ jobs:
           rm -f "$ssh_output" "$ssh_error"
           echo "SSH host-key verification and public-key authentication succeeded."
           echo "Read-only Litehost release and route diagnostics:"
-          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s <<'READONLY_DIAGNOSTICS'
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$GITHUB_EVENT_NAME" <<'READONLY_DIAGNOSTICS'
           set -euo pipefail
+          EVENT_NAME="$1"
           CURRENT="$HOME/production/current"
           if [[ -L "$CURRENT" ]]; then
             printf 'Active release path: %s\n' "$(readlink -f -- "$CURRENT")"
@@ -184,7 +185,84 @@ jobs:
             php artisan route:list --path=sitemap.xml -v
             php artisan route:list --path=robots.txt -v
           fi
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            ENV_FILE="$HOME/production/shared/.env"
+            BACKUP_FILE="$HOME/.env-before-seo-canonical-20261020"
+            EXPECTED_CANONICAL="SEO_CANONICAL_URL=https://lorenzochukwuebuka.com.ng"
+            if [[ ! -f "$ENV_FILE" ]]; then
+              echo "Production shared .env is missing; refusing deployment."
+              exit 1
+            fi
+            if ! grep -Fqx "$EXPECTED_CANONICAL" "$ENV_FILE"; then
+              if [[ ! -f "$BACKUP_FILE" ]]; then
+                cp -p -- "$ENV_FILE" "$BACKUP_FILE"
+                chmod 600 "$BACKUP_FILE"
+              fi
+              ENV_TEMP="$(mktemp "$HOME/production/shared/.env-canonical-XXXXXX")"
+              if ! awk -v expected="$EXPECTED_CANONICAL" '
+                BEGIN { found = 0 }
+                /^[[:space:]]*SEO_CANONICAL_URL[[:space:]]*=/ {
+                  if (!found) print expected
+                  found = 1
+                  next
+                }
+                { print }
+                END { if (!found) print expected }
+              ' "$ENV_FILE" > "$ENV_TEMP"; then
+                rm -f -- "$ENV_TEMP"
+                echo "Could not update the production canonical URL safely."
+                exit 1
+              fi
+              ENV_MODE="$(stat -c '%a' -- "$ENV_FILE")"
+              chmod "$ENV_MODE" "$ENV_TEMP"
+              mv -f -- "$ENV_TEMP" "$ENV_FILE"
+            fi
+            if ! grep -Fqx "$EXPECTED_CANONICAL" "$ENV_FILE"; then
+              echo "The production canonical URL did not validate after the update."
+              exit 1
+            fi
+            cd "$CURRENT"
+            php artisan config:cache
+            echo "Production canonical URL validated and active config cache refreshed; other .env values were not read or logged."
+          fi
           READONLY_DIAGNOSTICS
+
+      - name: Verify Current Production SEO Endpoints
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "https://lorenzochukwuebuka.com.ng"
+          checks = {
+              "/": ("text/html", ""),
+              "/sitemap.xml": ("application/xml", "<?xml"),
+              "/robots.txt": ("text/plain", "User-agent: *"),
+          }
+
+          for path, (expected_type, expected_prefix) in checks.items():
+              try:
+                  request = Request(base + path, headers={"User-Agent": "Litehost production smoke check", "Cache-Control": "no-cache"})
+                  with urlopen(request, timeout=20) as response:
+                      content_type = response.headers.get_content_type()
+                      body = response.read(100000).decode("utf-8", "replace")
+                      if response.status != 200 or content_type != expected_type:
+                          print(f"::error::Production {path} returned HTTP {response.status} with {content_type}; expected {expected_type}.")
+                          raise SystemExit(1)
+                      if expected_prefix and not body.lstrip().startswith(expected_prefix):
+                          print(f"::error::Production {path} returned unexpected content; response body was not logged.")
+                          raise SystemExit(1)
+                      print(f"Production {path}: HTTP {response.status}, {content_type}.")
+              except HTTPError as error:
+                  print(f"::error::Production {path} returned HTTP {error.code}; response body was not logged.")
+                  raise SystemExit(1)
+              except URLError as error:
+                  print(f"::error::Could not reach production {path} ({type(error.reason).__name__}).")
+                  raise SystemExit(1)
+          PY
 
       - name: Upload Candidate Release
         if: github.event_name == 'push'
