@@ -1,10 +1,13 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Media;
 use App\Models\Project;
+use App\Support\IndexNow\PublicContentIndexNowNotifier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -32,9 +35,9 @@ class ProjectController extends Controller
         // Search
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
-                $q->where('title', 'like', '%' . $request->search . '%')
-                    ->orWhere('description', 'like', '%' . $request->search . '%')
-                    ->orWhere('full_description', 'like', '%' . $request->search . '%');
+                $q->where('title', 'like', '%'.$request->search.'%')
+                    ->orWhere('description', 'like', '%'.$request->search.'%')
+                    ->orWhere('full_description', 'like', '%'.$request->search.'%');
             });
         }
 
@@ -58,22 +61,22 @@ class ProjectController extends Controller
         }
 
         $validated = $request->validate([
-            'title'            => 'required|string|max:255',
-            'slug'             => 'nullable|string|max:255|unique:projects,slug',
-            'description'      => 'required|string',
+            'title' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:projects,slug',
+            'description' => 'required|string',
             'full_description' => 'nullable|string',
-            'project_link'     => 'required|url',
-            'github_link'      => 'nullable|url',
-            'technologies'     => 'required|array',
-            'technologies.*'   => 'string',
-            'status'           => 'required|in:completed,in-progress,archived',
-            'completed_at'     => 'nullable|date',
-            'order'            => 'nullable|integer|min:0',
-            'is_featured'      => 'string',
-            'tags'             => 'nullable|array',
-            'tags.*'           => 'exists:tags,id',
-            'thumbnail'        => 'nullable|image|max:5120',
-            'main_image'       => 'nullable|image|max:5120',
+            'project_link' => 'required|url',
+            'github_link' => 'nullable|url',
+            'technologies' => 'required|array',
+            'technologies.*' => 'string',
+            'status' => 'required|in:completed,in-progress,archived',
+            'completed_at' => 'nullable|date',
+            'order' => 'nullable|integer|min:0',
+            'is_featured' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
+            'thumbnail' => 'nullable|image|max:5120',
+            'main_image' => 'nullable|image|max:5120',
         ]);
 
         if ($validated['is_featured'] === 'true') {
@@ -93,7 +96,7 @@ class ProjectController extends Controller
         }
 
         // Create project
-        $project = Project::create($validated);
+        $project = DB::transaction(fn () => Project::create($validated));
 
         // Attach tags
         if (isset($validated['tags'])) {
@@ -137,29 +140,29 @@ class ProjectController extends Controller
         if ($request->has('tags') && is_string($request->tags)) {
             $request->merge(['tags' => json_decode($request->tags, true)]);
         }
-        
+
         $validated = $request->validate([
-            'title'            => 'required|string|max:255',
-            'slug'             => [
+            'title' => 'required|string|max:255',
+            'slug' => [
                 'nullable',
                 'string',
                 'max:255',
                 Rule::unique('projects')->ignore($project->id),
             ],
-            'description'      => 'required|string',
+            'description' => 'required|string',
             'full_description' => 'nullable|string',
-            'project_link'     => 'required|url',
-            'github_link'      => 'nullable|url',
-            'technologies'     => 'required|array',
-            'technologies.*'   => 'string',
-            'status'           => 'required|in:completed,in-progress,archived',
-            'completed_at'     => 'nullable|date',
-            'order'            => 'nullable|integer|min:0',
-            'is_featured'      => 'string',
-            'tags'             => 'nullable|array',
-            'tags.*'           => 'exists:tags,id',
-            'thumbnail'        => 'nullable|image|max:5120',
-            'main_image'       => 'nullable|image|max:5120',
+            'project_link' => 'required|url',
+            'github_link' => 'nullable|url',
+            'technologies' => 'required|array',
+            'technologies.*' => 'string',
+            'status' => 'required|in:completed,in-progress,archived',
+            'completed_at' => 'nullable|date',
+            'order' => 'nullable|integer|min:0',
+            'is_featured' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
+            'thumbnail' => 'nullable|image|max:5120',
+            'main_image' => 'nullable|image|max:5120',
         ]);
 
         if ($validated['is_featured'] === 'true') {
@@ -174,11 +177,16 @@ class ProjectController extends Controller
         }
 
         // Update project
-        $project->update($validated);
+        DB::transaction(function () use ($project, $validated): void {
+            $project->update($validated);
+        });
+
+        $publicRelationsChanged = false;
 
         // Sync tags
         if (isset($validated['tags'])) {
-            $project->tags()->sync($validated['tags']);
+            $changes = $project->tags()->sync($validated['tags']);
+            $publicRelationsChanged = $changes['attached'] !== [] || $changes['detached'] !== [] || $changes['updated'] !== [];
         }
 
         // Handle thumbnail upload
@@ -189,6 +197,7 @@ class ProjectController extends Controller
                 $oldThumbnail->delete();
             }
             $this->uploadImage($request->file('thumbnail'), $project, 'thumbnail');
+            $publicRelationsChanged = true;
         }
 
         // Handle main image upload
@@ -199,6 +208,11 @@ class ProjectController extends Controller
                 $oldImage->delete();
             }
             $this->uploadImage($request->file('main_image'), $project, 'image');
+            $publicRelationsChanged = true;
+        }
+
+        if ($publicRelationsChanged) {
+            app(PublicContentIndexNowNotifier::class)->projectChanged($project, source: 'project-relations-updated');
         }
 
         return response()->json([
@@ -217,7 +231,9 @@ class ProjectController extends Controller
             Storage::delete($media->url);
         }
 
-        $project->delete();
+        DB::transaction(function () use ($project): void {
+            $project->delete();
+        });
 
         return response()->json([
             'message' => 'Project deleted successfully',
@@ -230,15 +246,17 @@ class ProjectController extends Controller
     public function reorder(Request $request)
     {
         $request->validate([
-            'projects'         => 'required|array',
-            'projects.*.id'    => 'required|exists:projects,id',
+            'projects' => 'required|array',
+            'projects.*.id' => 'required|exists:projects,id',
             'projects.*.order' => 'required|integer|min:0',
         ]);
 
-        foreach ($request->projects as $projectData) {
-            Project::where('id', $projectData['id'])
-                ->update(['order' => $projectData['order']]);
-        }
+        DB::transaction(function () use ($request): void {
+            foreach ($request->projects as $projectData) {
+                Project::query()->findOrFail($projectData['id'])
+                    ->update(['order' => $projectData['order']]);
+            }
+        });
 
         return response()->json([
             'message' => 'Projects reordered successfully',
@@ -250,11 +268,11 @@ class ProjectController extends Controller
      */
     private function uploadImage($file, Project $project, string $type)
     {
-        $path = $file->store('projects/' . $type, 'public');
+        $path = $file->store('projects/'.$type, 'public');
 
         $project->media()->create([
-            'url'       => $path,
-            'type'      => $type,
+            'url' => $path,
+            'type' => $type,
             'thumbnail' => $path,
         ]);
     }
@@ -265,7 +283,7 @@ class ProjectController extends Controller
     public function uploadGalleryImages(Request $request, Project $project)
     {
         $request->validate([
-            'images'   => 'required|array',
+            'images' => 'required|array',
             'images.*' => 'image|max:5120',
         ]);
 
@@ -275,17 +293,19 @@ class ProjectController extends Controller
             $path = $image->store('projects/gallery', 'public');
 
             $media = $project->media()->create([
-                'url'       => $path,
-                'type'      => 'gallery',
+                'url' => $path,
+                'type' => 'gallery',
                 'thumbnail' => $path,
             ]);
 
             $uploadedImages[] = $media;
         }
 
+        app(PublicContentIndexNowNotifier::class)->projectChanged($project, source: 'project-gallery-updated');
+
         return response()->json([
             'message' => 'Images uploaded successfully',
-            'images'  => $uploadedImages,
+            'images' => $uploadedImages,
         ]);
     }
 
@@ -302,6 +322,8 @@ class ProjectController extends Controller
 
         Storage::delete($media->url);
         $media->delete();
+
+        app(PublicContentIndexNowNotifier::class)->projectChanged($project, source: 'project-media-deleted');
 
         return response()->json([
             'message' => 'Media deleted successfully',

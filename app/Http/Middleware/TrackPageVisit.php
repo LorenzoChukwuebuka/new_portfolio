@@ -50,6 +50,7 @@ class TrackPageVisit
             'favicon.ico',
             'robots.txt',
             'sitemap.xml',
+            config('indexnow.key').'.txt',
         ]);
     }
 }
