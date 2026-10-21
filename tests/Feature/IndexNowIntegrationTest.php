@@ -401,6 +401,24 @@ test('initial URL command is a dry run by default and can only complete once aft
         ->toBe($postCount);
 });
 
+test('initial URL command can verify the production key without queuing or submitting URLs', function () {
+    app()->detectEnvironment(fn () => 'production');
+    $key = config('indexnow.key');
+    Http::fake([
+        'https://canonical.example/'.$key.'.txt' => Http::response($key, 200, ['Content-Type' => 'text/plain; charset=UTF-8']),
+        'https://api.indexnow.org/indexnow' => Http::response('', 202),
+    ]);
+
+    $this->artisan('indexnow:submit-existing --verify-key')
+        ->expectsOutputToContain('Verified the configured production key file: https://canonical.example/'.$key.'.txt')
+        ->expectsOutputToContain('No URLs were queued or submitted')
+        ->assertSuccessful();
+
+    expect(IndexNowBulkRun::count())->toBe(0);
+    Http::assertSentCount(1);
+    Http::assertNotSent(fn (ClientRequest $request) => $request->url() === 'https://api.indexnow.org/indexnow');
+});
+
 test('bulk submission execution is rejected outside production', function () {
     app()->detectEnvironment(fn () => 'testing');
     $this->artisan('indexnow:submit-existing --execute')

@@ -14,6 +14,7 @@ class SubmitExistingIndexNowUrls extends Command
 {
     protected $signature = 'indexnow:submit-existing
         {--execute : Verify the live key file and queue the existing public URLs}
+        {--verify-key : Verify the configured production key file without submitting URLs}
         {--batch=100 : URLs per request, from 1 through 10000}
         {--max-batches=100 : Maximum requests during this invocation}';
 
@@ -34,7 +35,16 @@ class SubmitExistingIndexNowUrls extends Command
             $this->line('  '.$url);
         }
 
-        if (! $this->option('execute')) {
+        $verifyOnly = (bool) $this->option('verify-key');
+        $execute = (bool) $this->option('execute');
+
+        if ($verifyOnly && $execute) {
+            $this->error('Choose either --verify-key or --execute.');
+
+            return self::FAILURE;
+        }
+
+        if (! $execute && ! $verifyOnly) {
             $this->comment('Dry run only. Add --execute after the production key URL has been verified.');
 
             return self::SUCCESS;
@@ -50,6 +60,14 @@ class SubmitExistingIndexNowUrls extends Command
             $this->error('The production key URL did not return HTTP 200, exact key text, and a plain-text content type. No URLs were queued.');
 
             return self::FAILURE;
+        }
+
+        $this->info('Verified the configured production key file: '.$service->keyLocation());
+
+        if ($verifyOnly) {
+            $this->comment('Verification only. No URLs were queued or submitted.');
+
+            return self::SUCCESS;
         }
 
         $batchSize = (int) $this->option('batch');

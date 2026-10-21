@@ -50,8 +50,11 @@ php artisan indexnow:submit-existing
 After deployment, first confirm `https://lorenzochukwuebuka.com.ng/{key}.txt` returns HTTP 200 with the exact configured key and plain-text content. The execution command repeats that verification remotely before it writes a one-time run marker or sends URLs:
 
 ```sh
+php artisan indexnow:submit-existing --verify-key
 php artisan indexnow:submit-existing --execute --batch=100 --max-batches=100
 ```
+
+The Litehost deployment workflow can run either operation through its manual dispatch input. Choose `verify-key` first to check the key configured in the shared production `.env` without submitting URLs; after the live key URL is confirmed, choose `submit-existing` to execute the guarded one-time run. The execution command repeats key verification before any IndexNow request.
 
 The database run marker prevents a completed full submission from being repeated. An interrupted run resumes its durable pending rows. Permanently failed rows require the explicit recovery command above. Do not execute this from local/testing environments; the command and service reject non-production submissions, and automated tests fake all HTTP calls.
 

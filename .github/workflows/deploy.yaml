@@ -5,6 +5,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      indexnow_action:
+        description: Verify the configured key file or run the guarded one-time URL submission
+        required: false
+        type: choice
+        options:
+          - none
+          - verify-key
+          - submit-existing
+        default: none
 
 permissions:
   contents: read
@@ -227,6 +237,42 @@ jobs:
             echo "Production canonical URL validated and active config cache refreshed; other .env values were not read or logged."
           fi
           READONLY_DIAGNOSTICS
+
+      - name: Run IndexNow production command
+        if: github.event_name == 'workflow_dispatch' && inputs.indexnow_action != 'none'
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ vars.CPANEL_SSH_PORT || '22' }}
+          INDEXNOW_ACTION: ${{ inputs.indexnow_action }}
+        run: |
+          set -euo pipefail
+
+          case "$INDEXNOW_ACTION" in
+            verify-key)
+              remote_command='cd "$HOME/production/current" && php artisan indexnow:submit-existing --verify-key'
+              ;;
+            submit-existing)
+              remote_command='cd "$HOME/production/current" && php artisan indexnow:submit-existing --execute --batch=100 --max-batches=100'
+              ;;
+            *)
+              echo "::error::Unsupported IndexNow action."
+              exit 1
+              ;;
+          esac
+
+          ssh_options=(
+            -i "$HOME/.ssh/id_deploy"
+            -p "$SSH_PORT"
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" "$remote_command"
 
       - name: Verify Current Production SEO Endpoints
         if: github.event_name == 'push'

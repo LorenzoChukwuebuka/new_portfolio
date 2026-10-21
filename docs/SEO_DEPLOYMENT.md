@@ -25,7 +25,7 @@ This application does not use Vue Router for public URLs. Public pages must have
 
 The checked-in GitHub Actions workflow builds Vite assets and installs Composer dependencies in CI, uploads a unique candidate release, links the shared `.env` and storage, then runs migrations and Laravel config, route, storage, and view commands inside that candidate. It switches `production/current` atomically only after those commands succeed. SSH uses a pinned host key and strict host-key checking; the port defaults to `22` and can be overridden with the repository variable `CPANEL_SSH_PORT`. It requires no persistent Node process, queue worker, Redis, or scheduled sitemap job. Database migrations run before activation against the shared production database, so migrations should remain compatible with the currently active release; a failed deployment does not automatically roll back database changes.
 
-See [the deployment diagnosis and readiness record](DEPLOYMENT_DIAGNOSIS_2026-10-20.md) for the verified endpoint, workflow history, security state, and current production verification results.
+The workflow validates the Litehost endpoint, pinned SSH host key, existing `production/current` release, and public document-root symlink before it runs production migrations or activates a candidate. A successful local build does not verify that a release has reached production.
 
 Before deploying:
 
