@@ -56,6 +56,8 @@ class SubmitExistingIndexNowUrls extends Command
             return self::FAILURE;
         }
 
+        $this->line('Configured production key URL: '.$service->keyLocation());
+
         if (! $service->verifyKeyFile()) {
             $this->error('The production key URL did not return HTTP 200, exact key text, and a plain-text content type. No URLs were queued.');
 
