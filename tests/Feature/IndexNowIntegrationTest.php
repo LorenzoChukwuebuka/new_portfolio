@@ -56,6 +56,28 @@ test('the IndexNow key URL returns the exact configured plain text key', functio
     $this->get('/'.str_repeat('a', 32).'.txt')->assertNotFound();
 });
 
+test('production release command writes the exact configured key as a public text file', function () {
+    $key = config('indexnow.key');
+    $publicDirectory = storage_path('framework/testing/indexnow-public-'.uniqid('', true));
+    mkdir($publicDirectory, 0777, true);
+    $originalPublicDirectory = app()->publicPath();
+    app()->usePublicPath($publicDirectory);
+
+    try {
+        $this->artisan('indexnow:publish-key-file')
+            ->expectsOutputToContain('Published IndexNow verification file')
+            ->assertSuccessful();
+
+        $path = $publicDirectory.'/'.$key.'.txt';
+        expect(file_get_contents($path))->toBe($key)
+            ->and(fileperms($path) & 0777)->toBe(0644);
+    } finally {
+        @unlink($publicDirectory.'/'.$key.'.txt');
+        @rmdir($publicDirectory);
+        app()->usePublicPath($originalPublicDirectory);
+    }
+});
+
 test('IndexNow URLs are canonical HTTPS URLs on eligible public routes only', function () {
     $service = app(IndexNowService::class);
 

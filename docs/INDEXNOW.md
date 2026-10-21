@@ -10,7 +10,7 @@ There is no queue worker or scheduled task configured in the Litehost deployment
 
 ## Key and endpoint
 
-`config/indexnow.php` contains a stable, generated 32-character key by default. It is a protocol verification key, not Laravel `APP_KEY`, Google verification, or an SSH key. `INDEXNOW_KEY` can override it in the shared `.env`, but keep the value unchanged across releases. The root route `/{key}.txt` serves the exact configured key with `text/plain; charset=UTF-8`; a non-matching key path returns 404. The route uses the `seo.infrastructure.*` namespace, so it is excluded from the sitemap.
+`config/indexnow.php` contains a stable, generated 32-character key by default. It is a protocol verification key, not Laravel `APP_KEY`, Google verification, or an SSH key. `INDEXNOW_KEY` can override it in the shared `.env`, but keep the value unchanged across releases. During release preparation, `indexnow:publish-key-file` writes the exact configured key to `{release}/public/{key}.txt` with mode `0644`; the checked-in public `.htaccess` serves that physical text file before Laravel routing. The root route `/{key}.txt` remains a fallback and rejects non-matching keys. Both use the same configured value, and the route is in `seo.infrastructure.*`, so it is excluded from the sitemap.
 
 The service posts JSON to `https://api.indexnow.org/indexnow` and includes `host`, `key`, `keyLocation`, and `urlList`. It canonicalizes and validates HTTPS URLs against the configured canonical host and eligible public Laravel route patterns. Requests are disabled outside `APP_ENV=production`.
 

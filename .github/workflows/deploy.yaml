@@ -452,6 +452,8 @@ jobs:
           php artisan migrate --force
           PHASE="Laravel cache preparation"
           php artisan config:cache
+          PHASE="IndexNow key file generation"
+          php artisan indexnow:publish-key-file
           php artisan storage:link
           php artisan route:cache
           php artisan view:cache
