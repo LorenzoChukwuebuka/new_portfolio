@@ -95,32 +95,33 @@ old branch.
 - The homepage source itself was intact: Blade returned the expected server
   rendered content and SEO metadata, but its HTML referenced old hashed Vite
   files. Those URLs returned Litehost HTML 404 pages, so the browser displayed
-  the SEO content without its visual styling or Vue behavior. The active
-  release's `public/build/manifest.json` and all files named by that manifest
-  were present and served with the expected CSS, JavaScript, and font MIME
-  types. The broken response therefore came from stale rendered HTML/runtime
-  state across an atomic `production/current` symlink activation, rather than
-  a missing build or incorrect `public_html/public` mapping.
-- Restarting the Litehost website container refreshed that stale state without
-  changing the release or document-root symlinks. The homepage then served the
-  active manifest's asset hashes; its dark styling, self-hosted fonts, hero
-  image, navigation, and Vue contact island rendered in the live browser.
-  Reproducing the issue after a second symlink switch showed the stable
-  `public_html/public -> production/current/public` path lets Litehost retain
-  the previous physical PHP entry path. The workflow now changes the web-root
-  symlink to the candidate's physical `releases/{id}/public` path so each
-  release has a distinct script path, and still checks the served commit and
-  asset identity rather than assuming `/up` is sufficient.
+  SEO content without its visual styling or Vue behavior. Candidate manifests
+  and files existed, but the HTML came from stale Laravel/PHP runtime state
+  after the atomic `production/current` switch. Restarting the Litehost website
+  container refreshed that state without changing the release or document-root
+  links. The dark layout, self-hosted fonts, portrait, navigation, and contact
+  island then rendered in the live browser.
+- A second controlled release reproduced the mismatch. Pointing
+  `public_html/public` at a candidate's physical `releases/{id}/public` path
+  did not refresh the response: it still returned the old commit's HTML and
+  missing asset hashes. That experiment was rolled back. The workflow preserves
+  the verified stable `public_html/public -> production/current/public`
+  arrangement and refuses a detached public root; changing symlink shape is
+  not treated as a runtime refresh.
 - The verified document-root rewrite remains unchanged:
   `public_html/.htaccess` routes requests through `/public/`. The workflow
-  validates that rewrite and the current web-root resolution, atomically
-  switches both `production/current` and `public_html/public` during
-  activation, and restores both captured targets if the browser check fails.
-  No production database, shared storage, or `.env` value was changed.
+  validates that rewrite and the current web-root resolution and switches only
+  `production/current`. A failed browser check switches it back to the captured
+  release. No production database, shared storage, or `.env` value was changed
+  by the corrective changes.
 - Deployment candidates now carry matching commit/release markers in the
   release root and public build directory, including manifest and Composer
   lock checksums. Before activation, the workflow validates every manifest
-  output and entry point on the server. After activation, Playwright verifies
+  output and entry point on the server. It also copies content-hashed assets
+  additively between the active and candidate releases, checking that any
+  duplicate hash has identical bytes. This keeps stale PHP output styled and
+  its old scripts available during a provider restart or rollback; each
+  release keeps its own manifest. After activation, Playwright verifies
   served asset bytes/types, release markers, Blade metadata, page rendering,
   Vue islands, navigation, mobile overflow, SEO routes, and expected 404s.
   A failed post-activation smoke restores the captured previous release only
@@ -132,6 +133,16 @@ old branch.
   `SMOKE_BASE_URL` checks, while the deploy job requires production indexability
   and the exact workflow commit. Playwright is a development-only dependency
   used by CI, not a production runtime dependency.
+- Litehost exposes a website-container restart control in the authenticated
+  panel, but the configured deployment access is SSH only; no supported
+  restart API or panel credential is configured for GitHub Actions. After
+  activation, the workflow retries its browser check up to eight times and
+  prints a restart prompt. An operator must click **Restart container** in the
+  Litehost panel during that window. If the served commit, asset responses, or
+  browser rendering still fail, the action records the failed candidate and
+  rolls back rather than reporting success. This guard prevents silent
+  regressions, but unattended activation remains dependent on a supported,
+  narrowly scoped Litehost restart integration.
 - The first two guarded deployment attempts stopped before migration or
   activation: Litehost PHP CLI rejects both `php -` and `/dev/stdin`. The
   workflow now invokes the checked-in `scripts/validate-release.php` from the
@@ -143,9 +154,13 @@ old branch.
   already-escaped layer before its normal escaped output; the SEO feature test
   guards the title output. Server-rendered article/content and SEO markup were
   retained.
-- Incident verification before the corrective workflow deployment: active
-  public routes and SEO endpoints returned HTTP 200, unknown paths returned
-  404, production assets matched the served manifest after the Litehost
-  restart, and a live browser confirmed the styled page and loaded fonts. Full
-  deployment run, commit, release ID, and post-activation checks are recorded
-  below after the workflow has run.
+- The first two guarded deployment attempts stopped before activation because
+  Litehost PHP CLI rejected `php -` and `/dev/stdin`; invoking the checked-in
+  validator script fixed both limitations. The next two runs activated
+  candidates but correctly failed their browser smoke because live Laravel
+  continued to serve old HTML and missing asset hashes; both rolled back. The
+  physical public-root experiment also failed and its workflow behavior was
+  reverted. Restarting the Litehost container after rollback restored the
+  styled homepage in the live browser. Latest corrective source is on `main`,
+  but its candidate is not the active production release until one passes the
+  post-activation browser smoke.
