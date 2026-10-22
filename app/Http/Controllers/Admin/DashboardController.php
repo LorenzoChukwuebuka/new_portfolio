@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\BlogComment;
 use App\Models\ContactMessage;
 use App\Models\Cv;
 use App\Models\PageVisit;
@@ -46,6 +47,11 @@ class DashboardController extends Controller
                 'read'    => ContactMessage::where('status', 'read')->count(),
                 'replied' => ContactMessage::where('status', 'replied')->count(),
                 'today'   => ContactMessage::whereDate('created_at', today())->count(),
+            ],
+            'comments'   => [
+                'total' => BlogComment::count(),
+                'pending' => BlogComment::where('status', 'pending')->count(),
+                'approved' => BlogComment::where('status', 'approved')->count(),
             ],
             'cvs'        => [
                 'total'           => Cv::count(),
@@ -147,7 +153,7 @@ class DashboardController extends Controller
      */
     public function pageVisitsAnalytics(Request $request)
     {
-        $days = $request->get('days', 14);
+        $days = $this->validatedDays($request, 14);
 
         $data = [];
         for ($i = $days - 1; $i >= 0; $i--) {
@@ -195,9 +201,11 @@ class DashboardController extends Controller
     /**
      * Get the most frequently visited public pages.
      */
-    public function topPages()
+    public function topPages(Request $request)
     {
+        $days = $this->validatedDays($request, 14);
         $pages = PageVisit::query()
+            ->where('created_at', '>=', now()->subDays($days)->startOfDay())
             ->select('path')
             ->selectRaw('COUNT(*) as visits')
             ->selectRaw('COUNT(DISTINCT ip_hash) as unique_visitors')
@@ -208,6 +216,32 @@ class DashboardController extends Controller
             ->get();
 
         return response()->json($pages);
+    }
+
+    /**
+     * Get unique visitors and referrer groups for the selected window.
+     */
+    public function referrerSources(Request $request)
+    {
+        $days = $this->validatedDays($request, 14);
+        $visits = PageVisit::query()
+            ->where('created_at', '>=', now()->subDays($days)->startOfDay())
+            ->get(['ip_hash', 'referer']);
+
+        $sources = $visits->groupBy(function (PageVisit $visit): string {
+            $host = $visit->referer ? parse_url($visit->referer, PHP_URL_HOST) : null;
+
+            return is_string($host) && $host !== '' ? strtolower($host) : 'Direct';
+        })->map(fn ($group, $source) => [
+            'source' => $source,
+            'visits' => $group->count(),
+            'unique_visitors' => $group->pluck('ip_hash')->filter()->unique()->count(),
+        ])->sortByDesc('visits')->take(8)->values();
+
+        return response()->json([
+            'unique_visitors' => $visits->pluck('ip_hash')->filter()->unique()->count(),
+            'referrers' => $sources,
+        ]);
     }
 
     /**
@@ -260,7 +294,7 @@ class DashboardController extends Controller
      */
     public function contactsAnalytics(Request $request)
     {
-        $days = $request->get('days', 7);
+        $days = $this->validatedDays($request, 7);
 
         $data = [];
         for ($i = $days - 1; $i >= 0; $i--) {
@@ -273,5 +307,14 @@ class DashboardController extends Controller
         }
 
         return response()->json($data);
+    }
+
+    private function validatedDays(Request $request, int $default): int
+    {
+        $validated = $request->validate([
+            'days' => ['sometimes', 'integer', 'in:7,14,30,90'],
+        ]);
+
+        return (int) ($validated['days'] ?? $default);
     }
 }

@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
         Route::get('/popular-projects', 'popularProjects');
         Route::get('/posts-analytics', 'postsAnalytics');
         Route::get('/page-visits-analytics', 'pageVisitsAnalytics');
+        Route::get('/referrer-sources', 'referrerSources');
         Route::get('/recent-visits', 'recentVisits');
         Route::get('/top-pages', 'topPages');
         Route::get('/post-performance', 'postPerformance');

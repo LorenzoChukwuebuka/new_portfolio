@@ -1,606 +1,116 @@
 <template>
   <Layout page-title="Dashboard">
-    <div class="space-y-6">
-      <AdminLoader
-        v-if="loading"
-        title="Loading dashboard"
-        message="Fetching portfolio stats, recent activity, and analytics."
-        :rows="5"
-      />
-
-      <template v-else>
-        <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div class="grid grid-cols-1 lg:grid-cols-[1.35fr_0.65fr]">
-            <div class="bg-slate-950 p-6 text-white sm:p-8">
-              <div class="flex flex-col justify-between gap-8 md:flex-row md:items-start">
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
-                    Live Portfolio Pulse
-                  </p>
-                  <h3 class="mt-4 max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-                    {{ stats?.visits.today || 0 }} visits today,
-                    {{ totalContentViews }} content views tracked.
-                  </h3>
-                  <p class="mt-4 max-w-xl text-sm leading-6 text-slate-400">
-                    A quick read on what people are opening, reading, and sending back to you.
-                  </p>
-                </div>
-                <a
-                  href="/"
-                  class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
-                >
-                  View public site
-                </a>
-              </div>
-
-              <div class="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div
-                  v-for="item in heroStats"
-                  :key="item.label"
-                  class="rounded-md border border-white/10 bg-white/5 p-4"
-                >
-                  <p class="text-xs font-medium text-slate-400">{{ item.label }}</p>
-                  <p class="mt-2 text-2xl font-semibold">{{ item.value }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-amber-50 p-6 sm:p-8">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
-                Top performer
-              </p>
-              <h4 class="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
-                {{ topContent?.title || "No views yet" }}
-              </h4>
-              <p class="mt-2 text-sm text-slate-600">
-                {{ topContent ? `${topContent.views} views across tracked content` : "Visits will appear here as people read posts and open projects." }}
-              </p>
-              <div class="mt-8 rounded-md bg-white p-4 shadow-sm">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="font-medium text-slate-700">Unread messages</span>
-                  <span class="font-semibold text-rose-700">{{ stats?.contacts.unread || 0 }}</span>
-                </div>
-                <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    class="h-full rounded-full bg-rose-500"
-                    :style="{ width: `${barWidth(stats?.contacts.unread || 0, Math.max(stats?.contacts.total || 0, 1))}%` }"
-                  />
-                </div>
-                <div class="mt-4 border-t border-slate-100 pt-4">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="font-medium text-slate-700">CV downloads</span>
-                    <span class="font-semibold text-amber-700">{{ stats?.cvs.total_downloads || 0 }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div
-            v-for="card in metricCards"
-            :key="card.label"
-            class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {{ card.label }}
-                </p>
-                <p class="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                  {{ card.value }}
-                </p>
-              </div>
-              <span class="rounded-md px-2.5 py-1 text-xs font-semibold" :class="card.badgeClass">
-                {{ card.badge }}
-              </span>
-            </div>
-            <p class="mt-3 text-sm text-slate-500">{{ card.note }}</p>
-            <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                class="h-full rounded-full"
-                :class="card.barClass"
-                :style="{ width: `${card.progress}%` }"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <h3 class="text-base font-semibold text-slate-950">
-                  Page Visits
-                </h3>
-                <p class="mt-1 text-sm text-slate-500">Last 14 days</p>
-              </div>
-              <span class="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                Peak {{ maxPageVisits }}
-              </span>
-            </div>
-
-            <div class="mt-6 flex h-56 items-end gap-2">
-              <div
-                v-for="item in pageVisitsAnalytics"
-                :key="item.date"
-                class="flex min-w-0 flex-1 flex-col items-center gap-2"
-              >
-                <div class="flex h-44 w-full items-end rounded-md bg-slate-50 px-1.5 pb-1.5">
-                  <div
-                    class="w-full rounded bg-slate-950 transition-all"
-                    :style="{ height: `${barWidth(item.visits || 0, maxPageVisits)}%` }"
-                    :title="`${item.date}: ${item.visits || 0} visits`"
-                  />
-                </div>
-                <span class="hidden text-[11px] font-medium text-slate-500 sm:block">
-                  {{ shortDate(item.date) }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 class="text-base font-semibold text-slate-950">
-              Publishing Mix
-            </h3>
-            <p class="mt-1 text-sm text-slate-500">Content and contact health</p>
-
-            <div class="mt-6 space-y-4">
-              <div
-                v-for="item in publishingMix"
-                :key="item.label"
-                class="space-y-2"
-              >
-                <div class="flex items-center justify-between text-sm">
-                  <span class="font-medium text-slate-700">{{ item.label }}</span>
-                  <span class="font-semibold text-slate-950">{{ item.value }}</span>
-                </div>
-                <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    class="h-full rounded-full"
-                    :class="item.class"
-                    :style="{ width: `${item.progress}%` }"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr_0.55fr]">
-          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-              <div>
-                <h3 class="text-base font-semibold text-slate-950">Recent Site Visits</h3>
-                <p class="mt-1 text-sm text-slate-500">Latest public page requests, with visitors anonymized</p>
-              </div>
-              <span class="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                Latest {{ recentVisits.length }}
-              </span>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50">
-                  <tr>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">When</th>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Page</th>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Source</th>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Visitor</th>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Device</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                  <tr v-if="!recentVisits.length">
-                    <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">
-                      Visits will appear here once the live site receives traffic.
-                    </td>
-                  </tr>
-                  <tr v-for="visit in recentVisits" :key="visit.id" class="hover:bg-slate-50">
-                    <td class="whitespace-nowrap px-5 py-3 text-slate-600">{{ formatDate(visit.visited_at) }}</td>
-                    <td class="max-w-[260px] truncate px-5 py-3 font-medium text-slate-950" :title="visit.path">
-                      {{ visit.path }}
-                    </td>
-                    <td class="max-w-[150px] truncate px-5 py-3 text-slate-600" :title="visit.source">
-                      {{ visit.source }}
-                    </td>
-                    <td class="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate-500">
-                      {{ visit.visitor }}
-                    </td>
-                    <td class="max-w-[190px] truncate px-5 py-3 text-slate-500" :title="visit.user_agent || ''">
-                      {{ agentLabel(visit.user_agent) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 px-5 py-4">
-              <h3 class="text-base font-semibold text-slate-950">Top Pages</h3>
-              <p class="mt-1 text-sm text-slate-500">Pages people open most</p>
-            </div>
-            <div class="divide-y divide-slate-100">
-              <p v-if="!topPages.length" class="px-5 py-10 text-center text-sm text-slate-500">No page visits yet.</p>
-              <div v-for="page in topPages" :key="page.path" class="px-5 py-4">
-                <p class="truncate text-sm font-medium text-slate-950" :title="page.path">{{ page.path }}</p>
-                <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
-                  <span>{{ page.unique_visitors }} unique visitors</span>
-                  <span class="font-semibold text-slate-700">{{ page.visits }} visits</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm xl:col-span-2">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-              <div>
-                <h3 class="text-base font-semibold text-slate-950">Blog Post Overview</h3>
-                <p class="mt-1 text-sm text-slate-500">Views and comment activity by post</p>
-              </div>
-              <span class="rounded-md bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
-                {{ postPerformance.length }} posts
-              </span>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50">
-                  <tr>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Post</th>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
-                    <th class="px-5 py-3 text-right text-xs font-semibold uppercase text-slate-500">Views</th>
-                    <th class="px-5 py-3 text-right text-xs font-semibold uppercase text-slate-500">Comments</th>
-                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Published</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  <tr v-if="!postPerformance.length">
-                    <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No blog posts created yet.</td>
-                  </tr>
-                  <tr v-for="post in postPerformance" :key="post.id" class="hover:bg-slate-50">
-                    <td class="max-w-[300px] px-5 py-3">
-                      <p class="truncate font-medium text-slate-950">{{ post.title }}</p>
-                      <p class="truncate text-xs text-slate-500">{{ post.category?.name || "Uncategorized" }}</p>
-                    </td>
-                    <td class="whitespace-nowrap px-5 py-3">
-                      <span class="rounded px-2 py-1 text-xs font-medium capitalize" :class="getStatusColor(post.status)">
-                        {{ post.status }}
-                      </span>
-                    </td>
-                    <td class="whitespace-nowrap px-5 py-3 text-right font-semibold text-sky-700">{{ post.views_count || 0 }}</td>
-                    <td class="whitespace-nowrap px-5 py-3 text-right text-slate-700">
-                      <span class="font-semibold">{{ post.approved_comments_count }}</span>
-                      <span v-if="post.pending_comments_count" class="ml-2 rounded bg-amber-50 px-1.5 py-1 text-xs font-semibold text-amber-700">
-                        {{ post.pending_comments_count }} pending
-                      </span>
-                    </td>
-                    <td class="whitespace-nowrap px-5 py-3 text-slate-500">
-                      {{ post.published_at ? formatShortDate(post.published_at) : "-" }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 px-5 py-4">
-              <h3 class="text-base font-semibold text-slate-950">Recent Activity</h3>
-            </div>
-            <div class="divide-y divide-slate-100">
-              <div
-                v-for="activity in recentActivities.slice(0, 7)"
-                :key="`${activity.type}-${activity.title}-${activity.date}`"
-                class="px-5 py-4"
-              >
-                <div class="flex gap-3">
-                  <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" :class="getActivityDot(activity.type)" />
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center justify-between gap-3">
-                      <p class="truncate text-sm font-medium text-slate-950">{{ activity.title }}</p>
-                      <span class="rounded px-2 py-1 text-xs font-medium capitalize" :class="getStatusColor(activity.status)">
-                        {{ activity.status }}
-                      </span>
-                    </div>
-                    <p class="mt-1 text-xs text-slate-500">{{ activity.type }} - {{ formatDate(activity.date) }}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 class="mb-4 text-base font-semibold text-slate-950">
-              Posts Analytics
-            </h3>
-            <div class="space-y-3">
-              <div
-                v-for="item in postsAnalytics"
-                :key="item.month"
-                class="flex items-center justify-between gap-4 rounded-md bg-slate-50 px-3 py-2"
-              >
-                <span class="text-sm font-medium text-slate-700">{{ item.month }}</span>
-                <div class="flex items-center gap-4">
-                  <span class="text-sm font-semibold text-sky-700"
-                    >{{ item.published }} published</span
-                  >
-                  <span class="text-sm text-slate-500"
-                    >{{ item.total }} total</span
-                  >
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 class="mb-4 text-base font-semibold text-slate-950">
-              Contact Messages
-            </h3>
-            <div class="space-y-3">
-            <div
-              v-for="item in contactsAnalytics"
-              :key="item.date"
-              class="grid grid-cols-[72px_1fr_auto] items-center gap-3"
-            >
-              <span class="text-sm font-medium text-slate-600">{{ item.date }}</span>
-              <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  class="h-full rounded-full bg-amber-500"
-                  :style="{ width: `${barWidth(item.count || 0, maxContacts)}%` }"
-                />
-              </div>
-              <span class="text-sm font-semibold text-slate-950">
-                {{ item.count || 0 }}
-              </span>
-            </div>
-          </div>
-          </div>
-        </section>
+    <div class="admin-page">
+    <PageHeader title="Dashboard" description="A clear read on portfolio activity and the work that needs your attention.">
+      <template #actions>
+        <label class="sr-only" for="dashboard-days">Analytics period</label>
+        <select id="dashboard-days" v-model.number="days" class="rounded-md border border-adm-line bg-adm-surface px-3 py-2 text-sm text-adm-ink" @change="loadVisits">
+          <option :value="7">Last 7 days</option><option :value="14">Last 14 days</option><option :value="30">Last 30 days</option><option :value="90">Last 90 days</option>
+        </select>
       </template>
+    </PageHeader>
+
+    <Card v-if="attentionCount" class="mb-5 border-l-4 border-l-adm-accent">
+      <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-sm font-semibold text-adm-ink">Needs your attention</p><p class="mt-1 text-sm text-adm-ink-muted">{{ attentionCount }} items are waiting in the portfolio workspace.</p></div><div class="flex flex-wrap gap-2"><router-link v-if="unreadContacts" class="rounded-md bg-adm-warning-bg px-3 py-2 text-sm font-semibold text-adm-warning-ink" to="/admin/contacts">{{ unreadContacts }} unread messages</router-link><router-link v-if="pendingComments" class="rounded-md bg-adm-info-bg px-3 py-2 text-sm font-semibold text-adm-info-ink" to="/admin/comments">{{ pendingComments }} comments to review</router-link><router-link v-if="draftCount" class="rounded-md bg-adm-surface-2 px-3 py-2 text-sm font-semibold text-adm-ink" to="/admin/posts?status=draft">{{ draftCount }} drafts</router-link></div></div>
+    </Card>
+
+    <ErrorBanner v-if="stats.error" :message="stats.error" :retry="loadStats" class="mb-4"/>
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Card v-for="item in kpis" :key="item.label"><p class="text-xs font-semibold uppercase tracking-wider text-adm-ink-muted">{{ item.label }}</p><p v-if="stats.loading" class="mt-3 h-8 w-24 animate-pulse rounded bg-adm-surface-2" aria-label="Loading KPI"/><p v-else class="mt-2 text-3xl font-semibold tracking-tight text-adm-ink">{{ item.value }}</p><p class="mt-1 text-xs text-adm-ink-muted">{{ item.detail }}</p></Card>
+    </div>
+
+    <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.75fr)]">
+      <Card>
+        <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-base font-semibold text-adm-ink">Visits and unique visitors</h2><p class="mt-1 text-sm text-adm-ink-muted">Daily traffic for the selected period</p></div><Badge variant="info">{{ visitsTotal }} visits</Badge></div>
+        <div v-if="visits.loading" class="mt-5 h-60 animate-pulse rounded-md bg-adm-surface-2" aria-label="Loading visits chart"/>
+        <ErrorBanner v-else-if="visits.error" class="mt-4" :message="visits.error" :retry="loadVisits"/>
+        <div v-else-if="visits.data.length" class="mt-4">
+          <div class="flex flex-wrap gap-4 text-xs text-adm-ink-muted"><span><i class="mr-2 inline-block h-2 w-2 rounded-full bg-adm-accent-bg"/>Visits</span><span><i class="mr-2 inline-block h-2 w-2 rounded-full bg-adm-info-ink"/>Unique visitors</span><span class="ml-auto">{{ uniqueTotal }} unique</span></div>
+          <div class="mt-3 overflow-x-auto"><svg class="admin-chart" viewBox="0 0 900 240" role="img" :aria-label="`Visits and unique visitors over ${days} days`" preserveAspectRatio="none"><defs><linearGradient id="visit-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--adm-accent-bg)" stop-opacity=".28"/><stop offset="1" stop-color="var(--adm-accent-bg)" stop-opacity="0"/></linearGradient></defs><path :d="areaPath('visits')" fill="url(#visit-fill)"/><polyline :points="linePoints('visits')" fill="none" stroke="var(--adm-accent-bg)" stroke-width="3" vector-effect="non-scaling-stroke"/><polyline :points="linePoints('unique')" fill="none" stroke="var(--adm-info-ink)" stroke-width="2" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/><g v-for="(item,index) in visits.data" :key="`${item.date}-${index}`" class="chart-point" tabindex="0" @mouseenter="hovered=index" @focus="hovered=index" @click="hovered=index"><circle :cx="x(index)" :cy="y(item.visits)" r="4" fill="var(--adm-accent-bg)"/><title>{{ item.date }} — {{ item.visits }} visits, {{ item.unique }} unique</title></g></svg></div>
+          <div class="mt-2 flex justify-between text-[11px] text-adm-ink-muted"><span>{{ visits.data[0]?.date }}</span><span v-if="hovered !== null">{{ visits.data[hovered]?.date }}: {{ visits.data[hovered]?.visits }} visits · {{ visits.data[hovered]?.unique }} unique</span><span>{{ visits.data.at(-1)?.date }}</span></div>
+        </div>
+        <EmptyState v-else class="mt-4" title="No visits in this period" description="Page visits will appear as people explore the public site."/>
+      </Card>
+
+      <Card>
+        <div class="flex items-start justify-between gap-3"><div><h2 class="text-base font-semibold text-adm-ink">Popular pages</h2><p class="mt-1 text-sm text-adm-ink-muted">Most visited routes</p></div><span v-if="pages.loading" class="h-5 w-12 animate-pulse rounded bg-adm-surface-2"/></div>
+        <ErrorBanner v-if="pages.error" class="mt-4" :message="pages.error" :retry="loadPages"/>
+        <ol v-else-if="pages.data.length" class="mt-4 divide-y divide-adm-line"> <li v-for="page in pages.data.slice(0,6)" :key="page.path" class="py-3"><div class="flex items-center justify-between gap-3"><span class="min-w-0 truncate text-sm font-medium text-adm-ink" :title="page.path">{{ page.path }}</span><Badge>{{ page.visits }}</Badge></div><p class="mt-1 text-xs text-adm-ink-muted">{{ page.unique_visitors }} unique visitors</p></li></ol>
+        <EmptyState v-else-if="!pages.loading && !pages.error" class="mt-4" title="No pages yet"/>
+      </Card>
+      <Card>
+        <div><h2 class="text-base font-semibold text-adm-ink">Referrer sources</h2><p class="mt-1 text-sm text-adm-ink-muted">Where visits came from</p></div>
+        <ErrorBanner v-if="visitors.error" class="mt-4" :message="visitors.error" :retry="loadVisitors"/>
+        <div v-else-if="visitors.loading" class="mt-4 h-40 animate-pulse rounded-md bg-adm-surface-2" aria-label="Loading visitor sources"/>
+        <ol v-else class="mt-4 divide-y divide-adm-line"><li v-for="source in visitors.data.referrers" :key="source.source" class="flex items-center justify-between gap-3 py-3"><span class="min-w-0 truncate text-sm text-adm-ink">{{ source.source }}</span><span class="shrink-0 text-xs text-adm-ink-muted">{{ source.visits }} · {{ source.unique_visitors }} unique</span></li><li v-if="!visitors.data.referrers.length" class="py-4 text-sm text-adm-ink-muted">No referrers recorded in this period.</li></ol>
+      </Card>
+    </div>
+
+    <div class="mt-5 grid gap-5 xl:grid-cols-2">
+      <Card>
+        <div class="flex items-start justify-between gap-3"><div><h2 class="text-base font-semibold text-adm-ink">Post performance</h2><p class="mt-1 text-sm text-adm-ink-muted">Views and discussion status</p></div><router-link class="text-sm font-semibold text-adm-accent" to="/admin/posts">Manage posts →</router-link></div>
+        <div v-if="performance.loading" class="mt-4 grid gap-2"><div v-for="n in 4" :key="n" class="h-12 animate-pulse rounded bg-adm-surface-2"/></div>
+        <ErrorBanner v-else-if="performance.error" class="mt-4" :message="performance.error" :retry="loadPerformance"/>
+        <div v-else class="mt-4 divide-y divide-adm-line"><router-link v-for="post in performance.data.slice(0,6)" :key="post.id" class="flex min-h-14 items-center justify-between gap-3 py-2 text-sm hover:text-adm-accent" :to="`/admin/posts/${post.slug}/edit`"><span class="min-w-0 truncate font-medium text-adm-ink">{{ post.title }}</span><span class="shrink-0 text-xs text-adm-ink-muted">{{ post.views_count }} views · {{ post.approved_comments_count }} approved · {{ post.pending_comments_count }} pending</span></router-link><EmptyState v-if="!performance.data.length" title="No posts yet" description="Create a post to see engagement here."/></div>
+      </Card>
+      <Card>
+        <div class="flex items-start justify-between gap-3"><div><h2 class="text-base font-semibold text-adm-ink">Recent activity</h2><p class="mt-1 text-sm text-adm-ink-muted">Latest changes across your workspace</p></div><router-link to="/admin/posts/create" class="rounded-md bg-adm-accent-bg px-3 py-2 text-sm font-semibold text-adm-accent-ink">New post</router-link></div>
+        <div v-if="activity.loading" class="mt-4 grid gap-2"><div v-for="n in 4" :key="n" class="h-12 animate-pulse rounded bg-adm-surface-2"/></div>
+        <ErrorBanner v-else-if="activity.error" class="mt-4" :message="activity.error" :retry="loadActivity"/>
+        <ol v-else class="mt-4 divide-y divide-adm-line"><li v-for="(item,index) in activity.data.slice(0,7)" :key="`${item.type}-${item.title}-${index}`" class="flex items-start justify-between gap-3 py-3"><div class="min-w-0"><p class="truncate text-sm font-medium text-adm-ink">{{ item.title }}</p><p class="text-xs capitalize text-adm-ink-muted">{{ item.type }} · {{ item.status }}</p></div><time class="shrink-0 text-xs text-adm-ink-muted" :datetime="item.date">{{ relative(item.date) }}</time></li></ol>
+      </Card>
+    </div>
+
+    <div class="mt-5 flex flex-wrap gap-3"><router-link to="/admin/posts/create" class="rounded-md bg-adm-accent-bg px-4 py-3 text-sm font-semibold text-adm-accent-ink">Write a post</router-link><router-link to="/admin/projects/create" class="rounded-md border border-adm-line bg-adm-surface px-4 py-3 text-sm font-semibold text-adm-ink">Add a project</router-link><router-link to="/admin/contacts" class="rounded-md border border-adm-line bg-adm-surface px-4 py-3 text-sm font-semibold text-adm-ink">Open inbox</router-link></div>
     </div>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
-import Layout from "../components/Layout.vue";
-import AdminLoader from "../components/AdminLoader.vue";
-import api from "../utils/api";
-import type { DashboardStats, Activity, Post, AnalyticsData, RecentVisit, TopPage, PostPerformance } from "../types";
+import { computed, onMounted, reactive, ref } from 'vue'
+import Layout from '../components/Layout.vue'
+import api from '../utils/api'
+import Badge from '../ui/Badge.vue'
+import Card from '../ui/Card.vue'
+import EmptyState from '../ui/EmptyState.vue'
+import ErrorBanner from '../ui/ErrorBanner.vue'
+import PageHeader from '../ui/PageHeader.vue'
 
-const stats = ref<DashboardStats | null>(null);
-const recentActivities = ref<Activity[]>([]);
-const popularPosts = ref<Post[]>([]);
-const popularProjects = ref<any[]>([]);
-const postsAnalytics = ref<AnalyticsData[]>([]);
-const pageVisitsAnalytics = ref<AnalyticsData[]>([]);
-const contactsAnalytics = ref<AnalyticsData[]>([]);
-const recentVisits = ref<RecentVisit[]>([]);
-const topPages = ref<TopPage[]>([]);
-const postPerformance = ref<PostPerformance[]>([]);
-const loading = ref(true);
-
-const maxPageVisits = computed(() =>
-  Math.max(...pageVisitsAnalytics.value.map((item) => item.visits || 0), 1)
-);
-
-const maxContacts = computed(() =>
-  Math.max(...contactsAnalytics.value.map((item) => item.count || 0), 1)
-);
-
-const totalContentViews = computed(
-  () => (stats.value?.posts.total_views || 0) + (stats.value?.projects.total_views || 0)
-);
-
-const heroStats = computed(() => [
-  { label: "All visits", value: stats.value?.visits.total || 0 },
-  { label: "Unique today", value: stats.value?.visits.unique_today || 0 },
-  { label: "Post views", value: stats.value?.posts.total_views || 0 },
-  { label: "Project views", value: stats.value?.projects.total_views || 0 },
-]);
-
-const topContent = computed(() => {
-  const posts = popularPosts.value.map((post) => ({
-    title: post.title,
-    views: post.views_count || 0,
-  }));
-  const projects = popularProjects.value.map((project) => ({
-    title: project.title,
-    views: project.views_count || 0,
-  }));
-
-  return [...posts, ...projects].sort((a, b) => b.views - a.views)[0] || null;
-});
-
-const metricCards = computed(() => [
-  {
-    label: "Site visits",
-    value: stats.value?.visits.total || 0,
-    badge: `${stats.value?.visits.today || 0} today`,
-    note: "Every public page load tracked internally.",
-    progress: barWidth(stats.value?.visits.today || 0, Math.max(stats.value?.visits.total || 0, 1)),
-    badgeClass: "bg-violet-50 text-violet-700",
-    barClass: "bg-violet-500",
-  },
-  {
-    label: "Writing views",
-    value: stats.value?.posts.total_views || 0,
-    badge: `${stats.value?.posts.published || 0} live`,
-    note: `${stats.value?.posts.draft || 0} drafts waiting in the wings.`,
-    progress: barWidth(stats.value?.posts.published || 0, Math.max(stats.value?.posts.total || 0, 1)),
-    badgeClass: "bg-sky-50 text-sky-700",
-    barClass: "bg-sky-500",
-  },
-  {
-    label: "Project views",
-    value: stats.value?.projects.total_views || 0,
-    badge: `${stats.value?.projects.featured || 0} featured`,
-    note: `${stats.value?.projects.completed || 0} completed projects in the library.`,
-    progress: barWidth(stats.value?.projects.featured || 0, Math.max(stats.value?.projects.total || 0, 1)),
-    badgeClass: "bg-emerald-50 text-emerald-700",
-    barClass: "bg-emerald-500",
-  },
-  {
-    label: "Inbox",
-    value: stats.value?.contacts.total || 0,
-    badge: `${stats.value?.contacts.unread || 0} unread`,
-    note: `${stats.value?.contacts.today || 0} messages arrived today.`,
-    progress: barWidth(stats.value?.contacts.unread || 0, Math.max(stats.value?.contacts.total || 0, 1)),
-    badgeClass: "bg-amber-50 text-amber-700",
-    barClass: "bg-amber-500",
-  },
-]);
-
-const publishingMix = computed(() => [
-  {
-    label: "Published posts",
-    value: stats.value?.posts.published || 0,
-    progress: barWidth(stats.value?.posts.published || 0, Math.max(stats.value?.posts.total || 0, 1)),
-    class: "bg-sky-500",
-  },
-  {
-    label: "Completed projects",
-    value: stats.value?.projects.completed || 0,
-    progress: barWidth(stats.value?.projects.completed || 0, Math.max(stats.value?.projects.total || 0, 1)),
-    class: "bg-emerald-500",
-  },
-  {
-    label: "Replied messages",
-    value: stats.value?.contacts.replied || 0,
-    progress: barWidth(stats.value?.contacts.replied || 0, Math.max(stats.value?.contacts.total || 0, 1)),
-    class: "bg-violet-500",
-  },
-]);
-
-onMounted(async () => {
-  try {
-    await Promise.all([
-      fetchStats(),
-      fetchRecentActivities(),
-      fetchPopularPosts(),
-      fetchPopularProjects(),
-      fetchPostsAnalytics(),
-      fetchPageVisitsAnalytics(),
-      fetchRecentVisits(),
-      fetchTopPages(),
-      fetchPostPerformance(),
-      fetchContactsAnalytics(),
-    ]);
-  } finally {
-    loading.value = false;
-  }
-});
-
-const fetchStats = async () => {
-  const { data } = await api.get("/admin/dashboard");
-  stats.value = data;
-};
-
-const fetchRecentActivities = async () => {
-  const { data } = await api.get("/admin/dashboard/recent-activities");
-  recentActivities.value = data;
-};
-
-const fetchPopularPosts = async () => {
-  const { data } = await api.get("/admin/dashboard/popular-posts");
-  popularPosts.value = data;
-};
-
-const fetchPopularProjects = async () => {
-  const { data } = await api.get("/admin/dashboard/popular-projects");
-  popularProjects.value = data;
-};
-
-const fetchPostsAnalytics = async () => {
-  const { data } = await api.get("/admin/dashboard/posts-analytics");
-  postsAnalytics.value = data;
-};
-
-const fetchPageVisitsAnalytics = async () => {
-  const { data } = await api.get("/admin/dashboard/page-visits-analytics");
-  pageVisitsAnalytics.value = data;
-};
-
-const fetchRecentVisits = async () => {
-  const { data } = await api.get("/admin/dashboard/recent-visits");
-  recentVisits.value = data;
-};
-
-const fetchTopPages = async () => {
-  const { data } = await api.get("/admin/dashboard/top-pages");
-  topPages.value = data;
-};
-
-const fetchPostPerformance = async () => {
-  const { data } = await api.get("/admin/dashboard/post-performance");
-  postPerformance.value = data;
-};
-
-const fetchContactsAnalytics = async () => {
-  const { data } = await api.get("/admin/dashboard/contacts-analytics");
-  contactsAnalytics.value = data;
-};
-
-const barWidth = (value: number, max: number) => {
-  return max === 0 ? 0 : Math.max(4, Math.round((value / max) * 100));
-};
-
-const shortDate = (date: string | undefined) => {
-  return date ? date.split(" ")[1] || date : "";
-};
-
-const agentLabel = (agent: string | null | undefined) => {
-  if (!agent) return "Unknown";
-  if (agent.includes("Mobile") || agent.includes("Android") || agent.includes("iPhone")) return "Mobile";
-  if (agent.includes("Chrome")) return "Chrome";
-  if (agent.includes("Firefox")) return "Firefox";
-  if (agent.includes("Safari")) return "Safari";
-  return "Desktop / Other";
-};
-
-const getActivityDot = (type: string) => {
-  const colors = {
-    post: "bg-sky-500",
-    project: "bg-emerald-500",
-    contact: "bg-amber-500",
-  };
-  return colors[type as keyof typeof colors] || "bg-slate-400";
-};
-
-const getStatusColor = (status: string) => {
-  const colors = {
-    published: "bg-emerald-50 text-emerald-700",
-    draft: "bg-amber-50 text-amber-700",
-    archived: "bg-slate-100 text-slate-700",
-    completed: "bg-emerald-50 text-emerald-700",
-    "in-progress": "bg-sky-50 text-sky-700",
-    unread: "bg-rose-50 text-rose-700",
-    read: "bg-sky-50 text-sky-700",
-    replied: "bg-emerald-50 text-emerald-700",
-  };
-  return colors[status as keyof typeof colors] || "bg-slate-100 text-slate-700";
-};
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-const formatShortDate = (date: string) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
+interface DailyVisit { date: string; visits: number; unique: number }
+interface PageRow { path: string; visits: number; unique_visitors: number }
+interface PostRow { id: number; title: string; slug: string; views_count: number; approved_comments_count: number; pending_comments_count: number }
+interface ActivityRow { type: string; title: string; status: string; date: string }
+const days = ref(14)
+const hovered = ref<number | null>(null)
+const stats = reactive<{ loading: boolean; error: string; data: any }>({ loading: true, error: '', data: null })
+const visits = reactive<{ loading: boolean; error: string; data: DailyVisit[] }>({ loading: true, error: '', data: [] })
+const pages = reactive<{ loading: boolean; error: string; data: PageRow[] }>({ loading: true, error: '', data: [] })
+const visitors = reactive<{ loading: boolean; error: string; data: { unique_visitors: number; referrers: { source: string; visits: number; unique_visitors: number }[] } }>({ loading: true, error: '', data: { unique_visitors: 0, referrers: [] } })
+const performance = reactive<{ loading: boolean; error: string; data: PostRow[] }>({ loading: true, error: '', data: [] })
+const activity = reactive<{ loading: boolean; error: string; data: ActivityRow[] }>({ loading: true, error: '', data: [] })
+const unreadContacts = computed(() => Number(stats.data?.contacts?.unread || 0))
+const pendingComments = computed(() => Number(stats.data?.comments?.pending || 0))
+const draftCount = computed(() => Number(stats.data?.posts?.draft || 0))
+const attentionCount = computed(() => unreadContacts.value + pendingComments.value + draftCount.value)
+const visitsTotal = computed(() => visits.data.reduce((sum, item) => sum + Number(item.visits || 0), 0))
+const uniqueTotal = computed(() => visitors.data.unique_visitors)
+const kpis = computed(() => [
+  { label: `${days.value}-day visits`, value: visitsTotal.value, detail: `${uniqueTotal.value} unique visitors` },
+  { label: 'Published posts', value: stats.data?.posts?.published ?? '—', detail: `${draftCount.value} drafts need review` },
+  { label: 'Projects', value: stats.data?.projects?.total ?? '—', detail: `${stats.data?.projects?.featured ?? 0} featured` },
+  { label: 'Unread messages', value: unreadContacts.value, detail: `${pendingComments.value} comments awaiting review` },
+])
+const maxVisits = computed(() => Math.max(...visits.data.map((item) => item.visits), 1))
+const x = (index: number) => visits.data.length < 2 ? 450 : 24 + (index * 852 / (visits.data.length - 1))
+const y = (value: number) => 210 - (Math.max(0, value) / maxVisits.value) * 184
+const linePoints = (key: 'visits' | 'unique') => visits.data.map((item, index) => `${x(index)},${y(item[key])}`).join(' ')
+const areaPath = (key: 'visits' | 'unique') => visits.data.length ? `M ${x(0)} 220 L ${visits.data.map((item, index) => `${x(index)} ${y(item[key])}`).join(' L ')} L ${x(visits.data.length - 1)} 220 Z` : ''
+async function loadStats() { stats.loading = true; stats.error = ''; try { const { data } = await api.get('/admin/dashboard'); stats.data = data } catch { stats.error = 'Dashboard totals could not be loaded.' } finally { stats.loading = false } }
+async function loadVisits() { visits.loading = true; visits.error = ''; try { const { data } = await api.get('/admin/dashboard/page-visits-analytics', { params: { days: days.value } }); visits.data = data } catch { visits.error = 'Visit analytics could not be loaded.' } finally { visits.loading = false } }
+async function loadPages() { pages.loading = true; pages.error = ''; try { const { data } = await api.get('/admin/dashboard/top-pages', { params: { days: days.value } }); pages.data = data } catch { pages.error = 'Top pages could not be loaded.' } finally { pages.loading = false } }
+async function loadVisitors() { visitors.loading = true; visitors.error = ''; try { const { data } = await api.get('/admin/dashboard/referrer-sources', { params: { days: days.value } }); visitors.data = data } catch { visitors.error = 'Visitor sources could not be loaded.' } finally { visitors.loading = false } }
+async function loadPerformance() { performance.loading = true; performance.error = ''; try { const { data } = await api.get('/admin/dashboard/post-performance'); performance.data = data } catch { performance.error = 'Post performance could not be loaded.' } finally { performance.loading = false } }
+async function loadActivity() { activity.loading = true; activity.error = ''; try { const { data } = await api.get('/admin/dashboard/recent-activities'); activity.data = data } catch { activity.error = 'Recent activity could not be loaded.' } finally { activity.loading = false } }
+function relative(value: string) { const minutes = Math.round((Date.now() - new Date(value).getTime()) / 60000); if (minutes < 1) return 'just now'; if (minutes < 60) return `${minutes}m ago`; const hours = Math.round(minutes / 60); return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago` }
+onMounted(() => { void Promise.allSettled([loadStats(), loadVisits(), loadPages(), loadVisitors(), loadPerformance(), loadActivity()]) })
 </script>
