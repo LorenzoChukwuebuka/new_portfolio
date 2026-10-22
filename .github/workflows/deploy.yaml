@@ -495,55 +495,7 @@ jobs:
           fi
 
           PHASE="remote Vite manifest and release consistency validation"
-          php /dev/stdin "$RELEASE_DIR" "$GITHUB_SHA" "$RELEASE" <<'PHP'
-          <?php
-          [$releaseDir, $commit, $release] = array_slice($argv, 1);
-          $buildDir = $releaseDir.'/public/build';
-          $manifestPath = $buildDir.'/manifest.json';
-          $markerPath = $buildDir.'/deploy-'.$commit.'.json';
-          $deploymentPath = $releaseDir.'/DEPLOYMENT.json';
-          $manifest = json_decode((string) @file_get_contents($manifestPath), true);
-          $marker = json_decode((string) @file_get_contents($markerPath), true);
-          $deployment = json_decode((string) @file_get_contents($deploymentPath), true);
-          if (!is_array($manifest) || !is_array($marker) || !is_array($deployment)) {
-              fwrite(STDERR, "Candidate manifest or commit marker is invalid.\n");
-              exit(1);
-          }
-          foreach (['resources/js/site.ts', 'resources/js/admin.ts'] as $entry) {
-              if (empty($manifest[$entry]['isEntry']) || empty($manifest[$entry]['file'])) {
-                  fwrite(STDERR, "Candidate manifest is missing {$entry}.\n");
-                  exit(1);
-              }
-          }
-          foreach ($manifest as $key => $item) {
-              if (!is_array($item)) {
-                  fwrite(STDERR, "Invalid candidate manifest entry {$key}.\n");
-                  exit(1);
-              }
-              foreach (array_merge([$item['file'] ?? null], $item['css'] ?? [], $item['assets'] ?? []) as $relative) {
-                  if ($relative === null) continue;
-                  if (!is_string($relative) || str_starts_with($relative, '/') || str_contains($relative, '..') || !is_file($buildDir.'/'.$relative)) {
-                      fwrite(STDERR, "Candidate manifest output missing or unsafe for {$key}.\n");
-                      exit(1);
-                  }
-              }
-              foreach (array_merge($item['imports'] ?? [], $item['dynamicImports'] ?? []) as $dependency) {
-                  if (!isset($manifest[$dependency])) {
-                      fwrite(STDERR, "Candidate manifest dependency missing for {$key}.\n");
-                      exit(1);
-                  }
-              }
-          }
-          $lockPath = $releaseDir.'/composer.lock';
-          if (($marker['commit'] ?? null) !== $commit || ($marker['release'] ?? null) !== $release ||
-              ($deployment['commit'] ?? null) !== $commit || ($deployment['release'] ?? null) !== $release ||
-              !hash_equals((string) ($marker['manifest_sha256'] ?? ''), hash_file('sha256', $manifestPath)) ||
-              !is_file($lockPath) || !hash_equals((string) ($marker['composer_lock_sha256'] ?? ''), hash_file('sha256', $lockPath))) {
-              fwrite(STDERR, "Candidate source, Vite manifest, and Composer lock do not match the release marker.\n");
-              exit(1);
-          }
-          echo "Candidate commit, manifest outputs, Composer lock, and release marker agree.\n";
-          PHP
+          php "$RELEASE_DIR/scripts/validate-release.php" "$GITHUB_SHA" "$RELEASE"
 
           if [[ -e "$RELEASE_DIR/.env" || -L "$RELEASE_DIR/.env" || -e "$RELEASE_DIR/storage" || -L "$RELEASE_DIR/storage" ]]; then
             echo "Candidate release already contains .env or storage; refusing to replace candidate data." >&2
