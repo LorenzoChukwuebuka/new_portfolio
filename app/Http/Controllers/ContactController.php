@@ -19,6 +19,13 @@ class ContactController extends Controller
      */
     public function store(ContactMessageRequest $request): JsonResponse
     {
+        if ($request->filled('website')) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Thank you for your message! I will get back to you soon.',
+            ]);
+        }
+
         $message = ContactMessage::create([
             'name' => $request->name,
             'email' => $request->email,

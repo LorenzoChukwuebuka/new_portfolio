@@ -15,6 +15,10 @@ class ContactMessageRequest extends FormRequest
 
     public function rules(): array
     {
+        if ($this->filled('website')) {
+            return [];
+        }
+
         return [
             'name'    => ['required', 'string', 'max:255'],
             'email'   => ['required', 'email', 'max:255'],
