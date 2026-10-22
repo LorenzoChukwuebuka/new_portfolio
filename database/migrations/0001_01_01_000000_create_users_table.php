@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -142,14 +141,6 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        DB::insert('INSERT INTO users (name, email, email_verified_at, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [
-            'Lorenzo Chukwuebuka Obi',
-            'lawrenceobi2@gmail.com',
-            now(),
-            bcrypt('changeMe123#!'),
-            now(),
-            now(),
-        ]);
     }
 
     /**

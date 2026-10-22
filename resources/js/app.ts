@@ -8,7 +8,6 @@ import Projects from './pages/Projects.vue'
 import ProjectDetail from './pages/ProjectDetail.vue'
 import Blog from './pages/Blog.vue'
 import BlogPost from './pages/BlogPost.vue'
-import Test from './test.vue'
 import App from './app.vue'
 import AdminRoute from "./admin/router"
 import api from './admin/utils/api'
@@ -119,7 +118,6 @@ const app = createApp({
     // template: '<RouterView />',
 })
 
-app.component('test-component', Test)
 app.component('app', App)
 app.component('home-component', Home)
 app.component('blog-component', Blog)
