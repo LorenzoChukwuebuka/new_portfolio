@@ -176,3 +176,14 @@ old branch.
   Documentation-only pushes are excluded from production deployment; pushes
   that change application or deployment code still go through the full smoke
   and rollback gate.
+- The final main deployment was run `39849732957`, commit
+  `25164ad52720cacc525a239986f801f33e16d51d`, release
+  `20261022203327-39849732957-1`. The first browser attempt detected stale
+  runtime output; restarting the Litehost container during the retry window
+  let the next attempt pass. That final run verified the 39 manifest outputs,
+  the home/blog/post/projects/project/admin-login pages, self-hosted font
+  responses, Vue islands, mobile menu behavior, mobile widths, SEO files,
+  `/up`, and the 404 route, then retained the active and previous releases.
+  A separate live-browser check confirmed all eight home images loaded, the
+  contact island mounted, the reveal elements were visible, no console errors
+  occurred, and a 390px viewport had zero horizontal overflow.
