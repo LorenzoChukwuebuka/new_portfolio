@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex, nofollow">
     <meta name="googlebot" content="noindex, nofollow">
-
     <script>
         (() => {
             const saved = localStorage.getItem('admin_theme');
@@ -15,9 +13,7 @@
             document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
         })();
     </script>
-
-    <title>@yield('title', 'Lorenzo Chukwuebuka Obi - Admin')</title>
-
+    <title>@yield('title', config('portfolio.name').' - Admin')</title>
     @php
         $manifestPath = public_path('build/manifest.json');
         $fontManifest = is_file($manifestPath)
@@ -28,15 +24,9 @@
     @if ($bodyFont)
         <link rel="preload" as="font" type="font/woff2" href="{{ asset('build/'.$bodyFont['file']) }}" crossorigin>
     @endif
-
-    <!-- Styles -->
-    @vite('resources/js/app.ts')
+    @vite('resources/js/admin.ts')
 </head>
-
 <body data-admin>
-    <div id="app">
-       <app></app>
-    </div>
+    <div id="app"><app></app></div>
 </body>
-
 </html>

@@ -1,32 +1,59 @@
 @extends('layouts.app')
 
-@section('title', 'Lorenzo Chukwuebuka Obi | Laravel and Go Software Engineer')
-@section('meta_description', 'Lorenzo Chukwuebuka Obi builds Laravel, Go, payment, dashboard, and SaaS systems for teams in Nigeria and beyond.')
-@section('og_title', 'Lorenzo Chukwuebuka Obi | Laravel and Go Software Engineer')
-@section('twitter_title', 'Lorenzo Chukwuebuka Obi | Laravel and Go Software Engineer')
+@section('title', config('portfolio.name').' | '.config('portfolio.role'))
+@section('meta_description', config('portfolio.summary'))
+@section('og_title', config('portfolio.name').' | '.config('portfolio.role'))
+@section('twitter_title', config('portfolio.name').' | '.config('portfolio.role'))
 
 @section('content')
-    <home-component :initial-projects='@json($projects)' :initial-posts='@json($posts)'>
-        <section class="mx-auto max-w-7xl px-6 py-24 text-zinc-100">
-            <h1 class="mb-5 text-4xl font-bold">I build reliable software for serious teams.</h1>
-            <p class="mb-10 max-w-3xl text-lg text-zinc-400">I work with founders and teams to build production-ready Laravel, Go, payment, dashboard, and SaaS systems with a focus on clarity, reliability, and long-term maintainability.</p>
-            <p class="mb-10"><a href="{{ route('seo.public.projects.index') }}">Browse all projects</a> · <a href="{{ route('seo.public.blog.index') }}">Read all articles</a></p>
-            <h2 class="mb-4 text-2xl font-semibold">Selected projects</h2>
-            <ul class="mb-10 space-y-2">
+<main id="main">
+    @include('partials.hero', ['hasActiveCv' => $hasActiveCv])
+
+    @include('partials.skills')
+
+    <section id="work" class="section home-work" aria-labelledby="work-title">
+        <div class="container-page">
+            <div class="section-heading" data-reveal>
+                <p class="eyebrow">Selected work / 01</p>
+                <h2 id="work-title">Projects built to hold up.</h2>
+                <p class="section-heading__description">A selection of practical systems, products, and experiments shaped around clear workflows.</p>
+            </div>
+            <div class="project-grid project-grid--featured">
                 @forelse ($projects as $project)
-                    <li><a href="{{ route('seo.public.projects.show', ['slug' => $project->slug]) }}">{{ $project->title }}</a> — {{ $project->description }}</li>
+                    @include('partials.project-card', ['project' => $project])
                 @empty
-                    <li>No projects are available yet.</li>
+                    <p class="empty-state">New project writeups are on the way.</p>
                 @endforelse
-            </ul>
-            <h2 class="mb-4 text-2xl font-semibold">Latest writing</h2>
-            <ul class="space-y-2">
-                @forelse ($posts->take(3) as $post)
-                    <li><a href="{{ route('seo.public.blog.show', ['slug' => $post->slug]) }}">{{ $post->title }}</a> — {{ $post->excerpt }}</li>
+            </div>
+            <div class="section-action" data-reveal>
+                <a class="btn btn-secondary" href="{{ route('seo.public.projects.index') }}">Explore all projects <span aria-hidden="true">↗</span></a>
+            </div>
+        </div>
+    </section>
+
+    <section id="blog" class="section home-writing" aria-labelledby="writing-title">
+        <div class="container-page">
+            <div class="section-heading section-heading--split" data-reveal>
+                <div>
+                    <p class="eyebrow">Field notes / 02</p>
+                    <h2 id="writing-title">Thinking made practical.</h2>
+                    <p class="section-heading__description">Writeups on engineering decisions, system design, and the work behind dependable software.</p>
+                </div>
+                <p class="writing-count"><strong>{{ $totalPosts }}</strong><span>published {{ \Illuminate\Support\Str::plural('article', $totalPosts) }}</span></p>
+            </div>
+            <div class="post-grid">
+                @forelse ($posts as $post)
+                    @include('partials.post-card', ['post' => $post])
                 @empty
-                    <li>No published articles yet.</li>
+                    <p class="empty-state">The first writeup is in progress.</p>
                 @endforelse
-            </ul>
-        </section>
-    </home-component>
+            </div>
+            <div class="section-action" data-reveal>
+                <a class="btn btn-secondary" href="{{ route('seo.public.blog.index') }}">Browse all writing <span aria-hidden="true">↗</span></a>
+            </div>
+        </div>
+    </section>
+
+    @include('partials.contact')
+</main>
 @endsection

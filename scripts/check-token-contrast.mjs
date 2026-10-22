@@ -12,7 +12,17 @@ function block(selector, after = 0) {
 }
 
 function variables(css) {
-  return Object.fromEntries([...css.matchAll(/(--[\w-]+)\s*:\s*(#[\da-fA-F]{6})\s*;/g)].map((match) => [match[1], match[2]]));
+  return Object.fromEntries([...css.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]));
+}
+
+function resolve(name, vars, primitives, seen = new Set()) {
+  if (seen.has(name)) return null;
+  seen.add(name);
+  const value = vars[name] ?? primitives[name];
+  if (!value) return null;
+  if (/^#[\da-fA-F]{6}$/.test(value)) return value;
+  const reference = value.match(/^var\((--[\w-]+)\)$/);
+  return reference ? resolve(reference[1], vars, primitives, seen) : null;
 }
 
 function luminance(hex) {
@@ -27,7 +37,7 @@ function contrast(foreground, background) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-const theme = variables(block('@theme'));
+const primitives = Object.fromEntries([...block('@theme').matchAll(/(--color-[\w-]+)\s*:\s*(#[\da-fA-F]{6})\s*;/g)].map((match) => [match[1], match[2]]));
 const light = variables(block(':root {'));
 const dark = variables(block(':root[data-theme="dark"]'));
 const failures = [];
@@ -35,10 +45,10 @@ let checked = 0;
 
 function assertPairs(name, vars, pairs) {
   for (const [foreground, background, target] of pairs) {
-    const fg = vars[foreground];
-    const bg = vars[background];
+    const fg = resolve(foreground, vars, primitives);
+    const bg = resolve(background, vars, primitives);
     if (!fg || !bg) {
-      failures.push(`${name}: missing ${foreground} or ${background}`);
+      failures.push(`${name}: could not resolve ${foreground} or ${background}`);
       continue;
     }
     checked++;
@@ -47,7 +57,7 @@ function assertPairs(name, vars, pairs) {
   }
 }
 
-assertPairs('public', theme, [
+const publicPairs = [
   ['--color-ink', '--color-canvas', 4.5],
   ['--color-ink-muted', '--color-canvas', 4.5],
   ['--color-ink-subtle', '--color-canvas', 4.5],
@@ -55,12 +65,14 @@ assertPairs('public', theme, [
   ['--color-accent-ink', '--color-accent', 4.5],
   ['--color-success', '--color-canvas', 4.5],
   ['--color-danger', '--color-canvas', 4.5],
-]);
+];
 
 const adminPairs = [
   ['--adm-ink', '--adm-bg', 4.5],
   ['--adm-ink-muted', '--adm-bg', 4.5],
-  ['--adm-accent-ink', '--adm-accent', 4.5],
+  ['--adm-accent', '--adm-surface', 4.5],
+  ['--adm-accent', '--adm-bg', 4.5],
+  ['--adm-accent-ink', '--adm-accent-bg', 4.5],
   ['--adm-sidebar-ink', '--adm-sidebar-bg', 4.5],
   ['--adm-focus', '--adm-bg', 3],
   ['--adm-success-ink', '--adm-success-bg', 4.5],
@@ -69,6 +81,7 @@ const adminPairs = [
   ['--adm-info-ink', '--adm-info-bg', 4.5],
 ];
 
+assertPairs('public dark', light, publicPairs);
 assertPairs('admin light', light, adminPairs);
 assertPairs('admin dark', dark, adminPairs);
 
