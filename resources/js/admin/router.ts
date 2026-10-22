@@ -83,6 +83,15 @@ const routes = [
     }
 ];
 
+if (import.meta.env.DEV) {
+    routes.push({
+        path: '/admin/_kit',
+        name: 'Admin UI kit',
+        component: () => import('./views/AdminKit.vue'),
+        meta: { requiresAuth: true },
+    });
+}
+
 // const router = createRouter({
 //   history: createWebHistory(),
 //   routes,

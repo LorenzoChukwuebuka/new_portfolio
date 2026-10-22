@@ -1,0 +1,2 @@
+<template><select :id="id" :value="modelValue" class="min-h-11 w-full rounded-md border border-adm-line bg-adm-surface-2 px-3 py-2 text-adm-ink focus:border-adm-focus focus:outline-none focus:ring-2 focus:ring-adm-focus/30" @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"><slot/></select></template>
+<script setup lang="ts">defineProps<{id:string;modelValue?:string|number}>();defineEmits<{ 'update:modelValue':[value:string] }>()</script>

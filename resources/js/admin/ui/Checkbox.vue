@@ -1,0 +1,2 @@
+<template><label class="inline-flex min-h-10 items-center gap-2 text-sm text-adm-ink"><input :id="id" type="checkbox" :checked="modelValue" class="h-4 w-4 rounded border-adm-line text-adm-accent focus:ring-adm-focus" @change="$emit('update:modelValue', ($event.target as HTMLInputElement).checked)"/><slot/></label></template>
+<script setup lang="ts">defineProps<{id:string;modelValue?:boolean}>();defineEmits<{ 'update:modelValue':[value:boolean] }>()</script>

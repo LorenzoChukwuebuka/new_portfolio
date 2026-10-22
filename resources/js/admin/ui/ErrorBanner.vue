@@ -1,0 +1,2 @@
+<template><div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-adm-danger-ink/25 bg-adm-danger-bg p-4 text-sm text-adm-danger-ink" role="alert"><span>{{ message }}</span><button v-if="retry" class="font-semibold underline underline-offset-2" type="button" @click="retry">Try again</button></div></template>
+<script setup lang="ts">defineProps<{ message: string; retry?: () => void }>()</script>

@@ -27,7 +27,7 @@ class ApiService {
             (error) => {
                 if (error.response?.status === 401) {
                     localStorage.removeItem('auth_token');
-                    window.location.href = '/admin';
+                    window.dispatchEvent(new CustomEvent('admin:unauthenticated'));
                 }
                 return Promise.reject(error);
             }
@@ -66,6 +66,10 @@ class ApiService {
         return this.api.put(url, data, config);
     }
 
+    patch(url: string, data?: any, config?: AxiosRequestConfig) {
+        return this.api.patch(url, data, config);
+    }
+
     delete(url: string, config?: AxiosRequestConfig) {
         return this.api.delete(url, config);
     }
@@ -78,6 +82,16 @@ class ApiService {
             },
         });
     }
+}
+
+export function apiErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.') {
+    const response = (error as { response?: { data?: { message?: string } } })?.response;
+    return response?.data?.message || (error instanceof Error ? error.message : fallback) || fallback;
+}
+
+export function fieldErrors(error: unknown): Record<string, string> {
+    const response = (error as { response?: { data?: { errors?: Record<string, string[]> } } })?.response;
+    return Object.fromEntries(Object.entries(response?.data?.errors || {}).map(([key, messages]) => [key, messages[0] || 'Invalid value.']));
 }
 
 export default new ApiService();

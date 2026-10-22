@@ -1,8 +1,8 @@
 <template>
-  <div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+  <div class="rounded-lg border border-adm-line bg-adm-surface p-6 shadow-sm">
     <div class="flex items-center gap-3">
       <span
-        class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-950 text-white"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-adm-sidebar-bg text-adm-sidebar-ink"
         aria-hidden="true"
       >
         <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -22,8 +22,8 @@
         </svg>
       </span>
       <div>
-        <p class="text-sm font-semibold text-slate-950">{{ title }}</p>
-        <p class="mt-0.5 text-sm text-slate-500">{{ message }}</p>
+        <p class="text-sm font-semibold text-adm-ink">{{ title }}</p>
+        <p class="mt-0.5 text-sm text-adm-ink-muted">{{ message }}</p>
       </div>
     </div>
 
@@ -31,7 +31,7 @@
       <div
         v-for="row in rows"
         :key="row"
-        class="h-12 animate-pulse rounded-md bg-slate-100"
+        class="h-12 animate-pulse rounded-md bg-adm-surface-2"
       />
     </div>
   </div>

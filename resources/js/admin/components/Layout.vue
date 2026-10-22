@@ -1,176 +1,133 @@
 <template>
-  <div class="min-h-screen bg-slate-100 text-slate-950">
-    <div
-      v-if="sidebarOpen"
-      class="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
-      @click="sidebarOpen = false"
-    />
-
-    <aside
-      class="fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-slate-950 text-white transition-transform duration-200 lg:translate-x-0"
-      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-    >
-      <div class="flex h-full flex-col">
-        <div class="border-b border-white/10 px-6 py-5">
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
-            Portfolio CMS
-          </p>
-          <h1 class="mt-2 text-lg font-semibold tracking-tight">
-            Lorenzo Admin
-          </h1>
-        </div>
-
-        <nav class="flex-1 space-y-1 px-3 py-5">
-          <router-link
-            v-for="item in navigation"
-            :key="item.name"
-            :to="item.href"
-            class="group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors"
-            :class="
-              isActive(item.href)
-                ? 'bg-white text-slate-950 shadow-sm'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
-            "
-            @click="sidebarOpen = false"
-          >
-            <component
-              :is="item.icon"
-              class="h-5 w-5 shrink-0"
-              :class="isActive(item.href) ? 'text-amber-500' : 'text-slate-500 group-hover:text-slate-200'"
-            />
-            {{ item.name }}
-          </router-link>
-        </nav>
-
-        <div class="border-t border-white/10 p-4">
-          <a
-            href="/"
-            class="flex items-center justify-between rounded-md border border-white/10 px-3 py-2 text-sm text-slate-300 transition-colors hover:border-amber-300/50 hover:text-white"
-          >
-            <span>View Site</span>
-            <span aria-hidden="true">↗</span>
-          </a>
-        </div>
+  <div class="admin-shell min-h-svh bg-adm-bg text-adm-ink">
+    <div v-if="drawerOpen" class="fixed inset-0 z-[var(--z-drawer)] bg-adm-sidebar-bg/65 lg:hidden" @click="closeDrawer"/>
+    <aside id="admin-navigation" class="admin-sidebar fixed inset-y-0 left-0 z-[calc(var(--z-drawer)+1)] flex w-[min(18rem,88vw)] -translate-x-full flex-col border-r border-adm-line bg-adm-sidebar-bg text-adm-sidebar-ink transition-transform duration-200 lg:z-30 lg:translate-x-0" :class="[drawerOpen ? '!translate-x-0' : '', collapsed ? 'lg:w-[5rem]' : 'lg:w-64']" :inert="isMobile && !drawerOpen" :aria-modal="isMobile && drawerOpen ? 'true' : undefined" :role="isMobile ? 'dialog' : 'complementary'" aria-label="Admin navigation">
+      <div class="flex h-16 items-center justify-between gap-3 border-b border-adm-sidebar-ink/10 px-4">
+        <router-link class="flex min-w-0 items-center gap-3 font-semibold" to="/admin/dashboard" @click="closeDrawer"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-adm-accent-bg text-adm-accent-ink">L.</span><span v-if="!collapsed || isMobile" class="truncate">Portfolio CMS</span></router-link>
+        <button v-if="isMobile" ref="closeButton" class="grid h-10 w-10 place-items-center rounded-md hover:bg-adm-sidebar-ink/10" aria-label="Close navigation" @click="closeDrawer">×</button>
+        <button v-else class="hidden h-9 w-9 place-items-center rounded-md text-adm-sidebar-ink hover:bg-adm-sidebar-ink/10 lg:grid" :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'" @click="toggleCollapsed">{{ collapsed ? '»' : '«' }}</button>
+      </div>
+      <nav class="flex-1 overflow-y-auto px-3 py-5">
+        <template v-for="group in groups" :key="group.label">
+          <p v-if="!collapsed || isMobile" class="mb-2 mt-5 px-3 text-[11px] font-semibold uppercase tracking-[.16em] text-adm-sidebar-ink/55 first:mt-0">{{ group.label }}</p>
+          <div class="grid gap-1">
+            <router-link v-for="item in group.items" :key="item.path" :to="item.path" class="group flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors" :class="isActive(item.path) ? 'bg-adm-accent-bg text-adm-accent-ink' : 'text-adm-sidebar-ink/75 hover:bg-adm-sidebar-ink/10 hover:text-adm-sidebar-ink'" :title="collapsed && !isMobile ? item.label : undefined" @click="closeDrawer">
+              <Icon :name="item.icon" class-name="h-5 w-5 shrink-0" :class="isActive(item.path) ? 'text-adm-accent-ink' : 'text-adm-sidebar-ink/65 group-hover:text-adm-sidebar-ink'"/>
+              <span v-if="!collapsed || isMobile" class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+              <span v-if="badgeCount(item.badge) && (!collapsed || isMobile)" class="rounded-full bg-adm-warning-bg px-2 py-0.5 text-[11px] font-bold text-adm-warning-ink">{{ badgeCount(item.badge) }}</span>
+              <span v-else-if="badgeCount(item.badge) && collapsed && !isMobile" class="ml-auto h-2 w-2 rounded-full bg-adm-accent-bg" aria-label="Items need review"/>
+            </router-link>
+          </div>
+        </template>
+      </nav>
+      <div class="grid gap-2 border-t border-adm-sidebar-ink/10 p-3">
+        <a href="/" class="flex min-h-10 items-center gap-3 rounded-md border border-adm-sidebar-ink/15 px-3 text-sm text-adm-sidebar-ink/80 hover:bg-adm-sidebar-ink/10"><span aria-hidden="true">↗</span><span v-if="!collapsed || isMobile">View site</span></a>
+        <div class="flex items-center justify-between gap-2 px-1"><span v-if="!collapsed || isMobile" class="truncate text-xs text-adm-sidebar-ink/65">{{ accountLabel }}</span><button class="min-h-10 rounded-md px-3 text-xs font-semibold text-adm-sidebar-ink/80 hover:bg-adm-sidebar-ink/10" @click="logout">{{ !collapsed || isMobile ? 'Sign out' : '↪' }}</button></div>
       </div>
     </aside>
 
-    <div class="lg:pl-72">
-      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div class="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+    <div class="min-h-svh transition-[padding] duration-200" :class="collapsed ? 'lg:pl-20' : 'lg:pl-64'">
+      <div class="fixed left-0 right-0 top-0 z-[var(--z-toast)] h-0.5 overflow-hidden bg-transparent lg:left-64" :class="collapsed ? 'lg:left-20' : ''"><span class="admin-route-progress" :class="navigating ? 'is-loading' : ''"/></div>
+      <header class="sticky top-0 z-20 border-b border-adm-line bg-adm-surface/95 backdrop-blur">
+        <div class="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <div class="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-600 lg:hidden"
-              @click="sidebarOpen = true"
-              aria-label="Open sidebar"
-            >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <div class="min-w-0">
-              <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                Admin Workspace
-              </p>
-              <h2 class="truncate text-2xl font-semibold tracking-tight text-slate-950">
-                {{ pageTitle }}
-              </h2>
-            </div>
+            <button ref="menuButton" class="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-adm-line text-adm-ink lg:hidden" aria-label="Open admin navigation" aria-controls="admin-navigation" :aria-expanded="drawerOpen" @click="openDrawer"><Icon name="menu" class-name="h-5 w-5"/></button>
+            <div class="min-w-0"><p class="text-[11px] font-semibold uppercase tracking-[.15em] text-adm-ink-muted">Workspace <span v-if="breadcrumb">/ {{ breadcrumb }}</span></p><h1 class="truncate text-lg font-semibold tracking-tight sm:text-xl">{{ pageTitle }}</h1></div>
           </div>
-
-          <button
-            type="button"
-            class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
-            @click="logout"
-          >
-            Logout
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            <details class="relative"><summary class="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md border border-adm-line px-3 text-sm font-medium hover:bg-adm-surface-2"><Icon name="plus" class-name="h-4 w-4"/><span class="hidden sm:inline">Create</span><span class="sm:hidden">New</span></summary><div class="absolute right-0 z-30 mt-2 grid w-48 rounded-md border border-adm-line bg-adm-surface p-1 shadow-adm-card"><router-link class="rounded px-3 py-2 text-sm hover:bg-adm-surface-2" to="/admin/posts/create">New post</router-link><router-link class="rounded px-3 py-2 text-sm hover:bg-adm-surface-2" to="/admin/projects/create">New project</router-link></div></details>
+            <ThemeToggle/>
+          </div>
         </div>
       </header>
-
-      <main class="px-4 py-6 sm:px-6 lg:px-8">
-        <slot />
+      <main id="admin-main" class="mx-auto w-full max-w-[100rem] px-4 py-5 sm:px-6 lg:px-8" :inert="drawerOpen">
+        <Transition name="admin-page" mode="out-in"><div :key="route.fullPath"><slot/></div></Transition>
       </main>
     </div>
+    <ToastHost/><ConfirmDialog/>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import api from "../utils/api";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import api from '../utils/api'
+import Icon from '../ui/Icon.vue'
+import ThemeToggle from '../ui/ThemeToggle.vue'
+import ToastHost from '../ui/ToastHost.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
 
-interface NavigationItem {
-  name: string;
-  href: string;
-  icon: any;
+const props = defineProps<{ pageTitle: string }>()
+const route = useRoute()
+const router = useRouter()
+const isMobile = ref(false)
+const drawerOpen = ref(false)
+const collapsed = ref(false)
+const unread = ref(0)
+const pending = ref(0)
+const navigating = ref(false)
+const menuButton = ref<HTMLButtonElement>()
+const closeButton = ref<HTMLButtonElement>()
+let polling: ReturnType<typeof setInterval> | undefined
+let media: MediaQueryList
+let returnFocus: HTMLElement | null = null
+
+type NavIcon = 'grid' | 'file' | 'folder' | 'tag' | 'hash' | 'mail' | 'chat' | 'download'
+const groups: { label: string; items: { label: string; path: string; icon: NavIcon; badge?: string }[] }[] = [
+  { label: 'Overview', items: [{ label: 'Dashboard', path: '/admin/dashboard', icon: 'grid' as const }] },
+  { label: 'Content', items: [{ label: 'Posts', path: '/admin/posts', icon: 'file' as const }, { label: 'Projects', path: '/admin/projects', icon: 'folder' as const }, { label: 'Categories', path: '/admin/categories', icon: 'tag' as const }, { label: 'Tags', path: '/admin/tags', icon: 'hash' as const }] },
+  { label: 'Inbox', items: [{ label: 'Contacts', path: '/admin/contacts', icon: 'mail' as const, badge: 'contacts' }, { label: 'Comments', path: '/admin/comments', icon: 'chat' as const, badge: 'comments' }] },
+  { label: 'Assets', items: [{ label: 'CV library', path: '/admin/cv', icon: 'download' as const }] },
+]
+const accountLabel = computed(() => localStorage.getItem('admin_name') || 'Administrator')
+const breadcrumb = computed(() => route.name === 'Dashboard' ? 'Overview' : String(route.meta.group || route.name || 'Admin'))
+function badgeCount(type?: string) { return type === 'contacts' ? unread.value : type === 'comments' ? pending.value : 0 }
+function isActive(path: string) { return path === '/admin/dashboard' ? route.path === path : route.path.startsWith(path) }
+function updateViewport() { isMobile.value = !media.matches }
+function toggleCollapsed() { collapsed.value = !collapsed.value; localStorage.setItem('admin_sidebar_collapsed', collapsed.value ? '1' : '0') }
+function closeDrawer() { if (!drawerOpen.value) return; drawerOpen.value = false; document.body.classList.remove('admin-drawer-open'); nextTick(() => (returnFocus || menuButton.value)?.focus()) }
+function openDrawer() { returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null; drawerOpen.value = true; document.body.classList.add('admin-drawer-open'); nextTick(() => closeButton.value?.focus()) }
+function keydown(event: KeyboardEvent) {
+  if (drawerOpen.value && event.key === 'Escape') { event.preventDefault(); closeDrawer(); return }
+  if (drawerOpen.value && event.key === 'Tab') {
+    const panel = document.getElementById('admin-navigation')
+    const items = Array.from(panel?.querySelectorAll<HTMLElement>('a[href],button:not([disabled])') || []).filter((element) => !element.inert)
+    if (!items.length) return
+    if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus() }
+    else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus() }
+  }
 }
-
-defineProps<{
-  pageTitle: string;
-}>();
-
-const route = useRoute();
-const router = useRouter();
-const sidebarOpen = ref(false);
-
-const isActive = (href: string) => {
-  if (href === "/admin") {
-    return route.path === href;
-  }
-  return route.path.startsWith(href);
-};
-
-const logout = async () => {
-  try {
-    await api.logout();
-  } finally {
-    router.push("/admin");
-  }
-};
-
-// Simple icon components (you can replace with heroicons)
-const DashboardIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>',
-};
-const DocumentIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
-};
-const FolderIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>',
-};
-const TagIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>',
-};
-const HashtagIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>',
-};
-const MailIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>',
-};
-const CommentIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a10.4 10.4 0 01-4-.78L3 20l1.35-3.6A7.38 7.38 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>',
-};
-const DocumentTextIcon = {
-  template:
-    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
-};
-
-const navigation: NavigationItem[] = [
-  { name: "Dashboard", href: "/admin/dashboard", icon: DashboardIcon },
-  { name: "Posts", href: "/admin/posts", icon: DocumentIcon },
-  { name: "Projects", href: "/admin/projects", icon: FolderIcon },
-  { name: "Categories", href: "/admin/categories", icon: TagIcon },
-  { name: "Tags", href: "/admin/tags", icon: HashtagIcon },
-  { name: "Contacts", href: "/admin/contacts", icon: MailIcon },
-  { name: "Comments", href: "/admin/comments", icon: CommentIcon },
-  { name: "CVs", href: "/admin/cv", icon: DocumentTextIcon },
-];
+async function loadBadges() {
+  if (document.visibilityState !== 'visible' || !api.isAuthenticated()) return
+  const [contactResult, commentResult] = await Promise.allSettled([api.get('/admin/contact-messages/unread-count'), api.get('/admin/comments/stats')])
+  if (contactResult.status === 'fulfilled') unread.value = Number(contactResult.value.data.count ?? contactResult.value.data.unread ?? 0)
+  if (commentResult.status === 'fulfilled') pending.value = Number(commentResult.value.data.pending || 0)
+}
+async function logout() { try { await api.logout() } finally { await router.push('/admin/login') } }
+function onNavigate(event: Event) { navigating.value = (event as CustomEvent<boolean>).detail }
+function shortcut(event: KeyboardEvent) { if (event.key === 'g' && !event.metaKey && !event.ctrlKey && !event.altKey) { window.setTimeout(() => { if (document.activeElement?.tagName === 'BODY') { /* next key handled by browser navigation links */ } }, 0) } }
+watch(() => route.fullPath, closeDrawer)
+watch(() => props.pageTitle, (title) => { document.title = `${title} · Portfolio` }, { immediate: true })
+onMounted(() => {
+  media = window.matchMedia('(min-width: 1024px)')
+  updateViewport()
+  media.addEventListener('change', updateViewport)
+  collapsed.value = localStorage.getItem('admin_sidebar_collapsed') === '1'
+  void loadBadges()
+  polling = window.setInterval(loadBadges, 60_000)
+  window.addEventListener('keydown', keydown)
+  window.addEventListener('keydown', shortcut)
+  document.addEventListener('visibilitychange', loadBadges)
+  window.addEventListener('admin:navigating', onNavigate)
+  window.addEventListener('admin:unauthenticated', () => { void router.push('/admin/login') })
+})
+onBeforeUnmount(() => {
+  if (polling) clearInterval(polling)
+  media?.removeEventListener('change', updateViewport)
+  window.removeEventListener('keydown', keydown)
+  window.removeEventListener('keydown', shortcut)
+  document.removeEventListener('visibilitychange', loadBadges)
+  window.removeEventListener('admin:navigating', onNavigate)
+  document.body.classList.remove('admin-drawer-open')
+})
 </script>

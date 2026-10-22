@@ -1,0 +1,2 @@
+<template><div class="rounded-lg border border-dashed border-adm-line p-8 text-center"><div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-adm-surface-2 text-adm-accent"><slot name="icon">✦</slot></div><h3 class="font-semibold text-adm-ink">{{ title }}</h3><p v-if="description" class="mx-auto mt-1 max-w-lg text-sm text-adm-ink-muted">{{ description }}</p><div v-if="$slots.actions" class="mt-4 flex justify-center gap-2"><slot name="actions"/></div></div></template>
+<script setup lang="ts">defineProps<{ title: string; description?: string }>()</script>
