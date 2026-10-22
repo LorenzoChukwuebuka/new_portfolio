@@ -1,59 +1,68 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Lawrence Chukwuebuka Obi — Portfolio
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 12 serves the public portfolio as server-rendered Blade pages. Vue 3 is
+loaded only for interactive public islands and the authenticated `/admin` SPA.
+Tailwind CSS v4 and Vite 7 provide the shared token-based design system.
 
-## About Laravel
+## Local setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Requirements: PHP 8.2+, Composer, Node.js 22.12+, and a database supported by
+Laravel. SQLite is suitable for a local install.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```sh
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Configure the database in `.env`. To create an administrator with the database
+seeder, set both `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the environment first;
+the seeder does not invent credentials, and refuses to seed a production admin
+without a password. Then run:
 
-## Learning Laravel
+```sh
+php artisan migrate --seed
+npm ci
+npm run build
+php artisan storage:link
+php artisan serve
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+The public site is available at `http://127.0.0.1:8000`. The admin SPA is at
+`/admin/login`. Public article content is sanitized and rendered by Laravel;
+Vue islands add form, copy-link, and navigation behavior without replacing the
+server-rendered content.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Useful commands
 
-## Laravel Sponsors
+```sh
+npm run dev                 # Vite development server
+npm run build               # Production assets
+npm run typecheck           # Vue and TypeScript type checks
+npm run check:contrast      # Check documented WCAG text pairs
+php artisan test            # Laravel unit and feature tests
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+See [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) for tokens, component usage,
+and the local public kitchen sink at `/_design`. In a Vite development build,
+the authenticated admin kit is at `/admin/_kit`.
 
-### Premium Partners
+## Project structure
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- `resources/views/` — public Blade layouts, pages, and reusable partials.
+- `resources/js/site.ts` — small public entry and dynamically loaded islands.
+- `resources/js/admin.ts` — isolated admin SPA entry and lazy route views.
+- `resources/css/tokens.css` — primitive and semantic design tokens.
+- `app/Support/Content/ArticleHtml.php` — Quill HTML allow-list sanitizer and
+  article outline builder.
+- `docs/` — design, SEO, deployment, and overhaul notes.
 
-## Contributing
+## Deployment
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+The production workflow runs on pushes to `main`; pushing this overhaul to
+`main` therefore starts a production deployment. Deployment requires the
+existing Litehost and IndexNow environment configuration documented in
+[docs/SEO_DEPLOYMENT.md](docs/SEO_DEPLOYMENT.md). Run `npm ci` without
+`--force` when installing assets. The release workflow runs pending migrations
+before it activates a release. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` securely
+before running `php artisan db:seed --class=Database\\Seeders\\AdminUserSeeder`.
