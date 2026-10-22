@@ -101,19 +101,22 @@ old branch.
   types. The broken response therefore came from stale rendered HTML/runtime
   state across an atomic `production/current` symlink activation, rather than
   a missing build or incorrect `public_html/public` mapping.
-- Restarting the Litehost PHP container refreshed that stale state without
+- Restarting the Litehost website container refreshed that stale state without
   changing the release or document-root symlinks. The homepage then served the
   active manifest's asset hashes; its dark styling, self-hosted fonts, hero
-  image, navigation, and Vue contact island rendered in the live browser. This
-  points to retained PHP worker/realpath/view state after symlink activation;
-  the workflow now verifies active commit and asset identity to detect that
-  condition instead of assuming `/up` is sufficient.
-- The production document-root arrangement was left untouched: `public_html`
-  rewrites through its existing `.htaccess` to `public/`, and
-  `public_html/public` follows `production/current/public`. Candidate deploy
-  validation now resolves and checks these exact relationships before
-  activation. No production database, shared storage, `.env`, or symlink was
-  changed during diagnosis.
+  image, navigation, and Vue contact island rendered in the live browser.
+  Reproducing the issue after a second symlink switch showed the stable
+  `public_html/public -> production/current/public` path lets Litehost retain
+  the previous physical PHP entry path. The workflow now changes the web-root
+  symlink to the candidate's physical `releases/{id}/public` path so each
+  release has a distinct script path, and still checks the served commit and
+  asset identity rather than assuming `/up` is sufficient.
+- The verified document-root rewrite remains unchanged:
+  `public_html/.htaccess` routes requests through `/public/`. The workflow
+  validates that rewrite and the current web-root resolution, atomically
+  switches both `production/current` and `public_html/public` during
+  activation, and restores both captured targets if the browser check fails.
+  No production database, shared storage, or `.env` value was changed.
 - Deployment candidates now carry matching commit/release markers in the
   release root and public build directory, including manifest and Composer
   lock checksums. Before activation, the workflow validates every manifest

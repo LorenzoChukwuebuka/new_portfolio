@@ -418,9 +418,15 @@ jobs:
             echo "::error::The current release is not a valid rollback target; activation stopped."
             exit 1
           fi
+          PREVIOUS_PUBLIC_LINK="$(ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" "readlink -- '$REMOTE_HOME/public_html/public'")"
+          if [[ "$PREVIOUS_PUBLIC_LINK" != *production/current/public && "$PREVIOUS_PUBLIC_LINK" != "$PREVIOUS_RELEASE/public" ]]; then
+            echo "::error::Litehost public_html/public does not point to the captured active release; activation stopped."
+            exit 1
+          fi
           printf 'previous_release=%s\n' "$PREVIOUS_RELEASE" >> "$GITHUB_OUTPUT"
+          printf 'previous_public_link=%s\n' "$PREVIOUS_PUBLIC_LINK" >> "$GITHUB_OUTPUT"
 
-          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$BASE" "$RELEASE" "$REMOTE_HOME" "$GITHUB_SHA" "$PREVIOUS_RELEASE" <<'REMOTE_SCRIPT'
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$BASE" "$RELEASE" "$REMOTE_HOME" "$GITHUB_SHA" "$PREVIOUS_RELEASE" "$PREVIOUS_PUBLIC_LINK" <<'REMOTE_SCRIPT'
           set -Eeuo pipefail
 
           BASE="$1"
@@ -428,6 +434,7 @@ jobs:
           REMOTE_HOME="$3"
           GITHUB_SHA="$4"
           EXPECTED_PREVIOUS="$5"
+          EXPECTED_PREVIOUS_PUBLIC_LINK="$6"
           RELEASE_DIR="$BASE/releases/$RELEASE"
           PHASE="candidate validation"
           trap 'status=$?; printf "Deployment failed during %s for candidate %s (exit %s). The active release was not switched unless activation had completed.\n" "$PHASE" "$RELEASE" "$status" >&2; exit "$status"' ERR
@@ -464,8 +471,13 @@ jobs:
           fi
 
           PUBLIC_LINK_LITERAL="$(readlink -- "$PUBLIC_LINK" || true)"
-          if [[ "$PUBLIC_LINK_LITERAL" != *production/current/public ]]; then
-            echo "Litehost public_html/public must keep following production/current/public; refusing to change the existing web-root symlink." >&2
+          if [[ "$PUBLIC_LINK_LITERAL" != "$EXPECTED_PREVIOUS_PUBLIC_LINK" ]]; then
+            echo "Litehost public_html/public changed after rollback target capture; refusing activation." >&2
+            exit 1
+          fi
+
+          if [[ "$PUBLIC_LINK_LITERAL" != *production/current/public && "$PUBLIC_LINK_LITERAL" != "$EXPECTED_PREVIOUS/public" ]]; then
+            echo "Litehost public_html/public does not follow the active release; refusing to change the existing web-root symlink." >&2
             exit 1
           fi
 
@@ -484,6 +496,7 @@ jobs:
           printf '  production/current -> %s\n' "$CURRENT_TARGET"
           printf '  public_html/public -> %s\n' "$PUBLIC_LINK_LITERAL"
           printf '  public_html/public resolves to -> %s\n' "$PUBLIC_TARGET"
+          printf '  active public release path: %s\n' "$CURRENT_PUBLIC_TARGET"
           printf '  document root rewrite rules:\n'
           grep -E '^[[:space:]]*Rewrite(Cond|Rule)' "$REMOTE_HOME/public_html/.htaccess" || true
           stat -c '  %A %a %U:%G %n' "$REMOTE_HOME/public_html" "$PUBLIC_TARGET" "$CURRENT_TARGET/public/build" "$CURRENT_TARGET/public/build/manifest.json"
@@ -525,6 +538,19 @@ jobs:
             exit 1
           fi
           printf 'ACTIVE_RELEASE_PATH=%s\n' "$(readlink -f -- "$CURRENT")"
+          PHASE="atomic public-root release activation"
+          NEXT_PUBLIC_LINK="$REMOTE_HOME/public_html/.public-$RELEASE"
+          ln -s -- "$RELEASE_DIR/public" "$NEXT_PUBLIC_LINK"
+          if ! mv -Tf -- "$NEXT_PUBLIC_LINK" "$PUBLIC_LINK"; then
+            rm -f -- "$NEXT_PUBLIC_LINK"
+            echo "Could not atomically point Litehost's public root at the candidate release." >&2
+            exit 1
+          fi
+          if [[ "$(readlink -f -- "$PUBLIC_LINK")" != "$RELEASE_DIR/public" ]]; then
+            echo "Litehost public root did not resolve to the candidate release after activation." >&2
+            exit 1
+          fi
+          printf 'ACTIVE_PUBLIC_PATH=%s\n' "$(readlink -f -- "$PUBLIC_LINK")"
           trap - ERR
 
           echo "Activated release $RELEASE."
@@ -544,6 +570,7 @@ jobs:
           CPANEL_USER: ${{ secrets.CPANEL_USER }}
           SSH_PORT: ${{ vars.CPANEL_SSH_PORT || '22' }}
           PREVIOUS_RELEASE: ${{ steps.activate.outputs.previous_release }}
+          PREVIOUS_PUBLIC_LINK: ${{ steps.activate.outputs.previous_public_link }}
           FAILED_RELEASE: ${{ env.RELEASE }}
           FAILED_COMMIT: ${{ github.sha }}
         run: |
@@ -563,16 +590,23 @@ jobs:
             echo "::error::Rollback arguments did not pass validation."
             exit 1
           fi
-          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$REMOTE_HOME/production" "$FAILED_RELEASE" "$PREVIOUS_RELEASE" "$FAILED_COMMIT" <<'ROLLBACK'
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$REMOTE_HOME/production" "$FAILED_RELEASE" "$PREVIOUS_RELEASE" "$FAILED_COMMIT" "$PREVIOUS_PUBLIC_LINK" <<'ROLLBACK'
           set -euo pipefail
           BASE="$1"
           FAILED_RELEASE="$2"
           PREVIOUS_RELEASE="$3"
           FAILED_COMMIT="$4"
+          PREVIOUS_PUBLIC_LINK="$5"
           CURRENT="$BASE/current"
+          REMOTE_HOME="${BASE%/production}"
+          PUBLIC_LINK="$REMOTE_HOME/public_html/public"
           CANDIDATE="$BASE/releases/$FAILED_RELEASE"
-          if [[ "$PREVIOUS_RELEASE" != "$BASE"/releases/* || ! -d "$PREVIOUS_RELEASE" || ! -L "$CURRENT" ]]; then
+          if [[ "$PREVIOUS_RELEASE" != "$BASE"/releases/* || ! -d "$PREVIOUS_RELEASE" || ! -L "$CURRENT" || ! -L "$PUBLIC_LINK" ]]; then
             echo "Rollback target is unavailable or outside the release directory; no symlink change made." >&2
+            exit 1
+          fi
+          if [[ "$PREVIOUS_PUBLIC_LINK" != *production/current/public && "$PREVIOUS_PUBLIC_LINK" != "$PREVIOUS_RELEASE/public" ]]; then
+            echo "Captured public-root rollback target is outside the verified release arrangement; no symlink change made." >&2
             exit 1
           fi
           CURRENT_TARGET="$(readlink -f -- "$CURRENT" || true)"
@@ -596,7 +630,10 @@ jobs:
           NEXT_LINK="$BASE/.rollback-$FAILED_RELEASE"
           ln -s -- "$PREVIOUS_RELEASE" "$NEXT_LINK"
           mv -Tf -- "$NEXT_LINK" "$CURRENT"
-          printf 'Rolled back failed release %s to %s. Database and shared storage were left untouched. Failure record: %s\n' "$FAILED_RELEASE" "$PREVIOUS_RELEASE" "$FAILURE_RECORD"
+          NEXT_PUBLIC_LINK="$REMOTE_HOME/public_html/.public-rollback-$FAILED_RELEASE"
+          ln -s -- "$PREVIOUS_PUBLIC_LINK" "$NEXT_PUBLIC_LINK"
+          mv -Tf -- "$NEXT_PUBLIC_LINK" "$PUBLIC_LINK"
+          printf 'Rolled back failed release %s to %s and restored public root %s. Database and shared storage were left untouched. Failure record: %s\n' "$FAILED_RELEASE" "$PREVIOUS_RELEASE" "$PREVIOUS_PUBLIC_LINK" "$FAILURE_RECORD"
           ROLLBACK
 
       - name: Clean old releases after successful browser smoke
