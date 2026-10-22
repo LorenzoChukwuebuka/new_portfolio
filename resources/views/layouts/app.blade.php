@@ -6,18 +6,33 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @php
         $portfolio = config('portfolio');
+        $deploymentPath = base_path('DEPLOYMENT.json');
+        $deployment = is_file($deploymentPath)
+            ? (json_decode(file_get_contents($deploymentPath), true) ?: [])
+            : [];
+        $normalizeSeoText = static fn ($value) => html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $defaultTitle = $portfolio['name'].' | '.$portfolio['role'];
         $defaultDescription = $portfolio['summary'];
-        $seoTitle = $__env->yieldContent('title', $defaultTitle);
-        $seoDescription = $__env->yieldContent('meta_description', $defaultDescription);
-        $seoCanonical = $__env->yieldContent(
+        $seoTitle = $normalizeSeoText($__env->yieldContent('title', $defaultTitle));
+        $seoDescription = $normalizeSeoText($__env->yieldContent('meta_description', $defaultDescription));
+        $seoCanonical = $normalizeSeoText($__env->yieldContent(
             'canonical',
             app(\App\Support\Seo\CanonicalUrl::class)->forPath(request()->getPathInfo()),
-        );
-        $seoImage = $__env->yieldContent(
+        ));
+        $seoImage = $normalizeSeoText($__env->yieldContent(
             'og_image',
             app(\App\Support\Seo\CanonicalUrl::class)->forPath($portfolio['profile_image']),
-        );
+        ));
+        $seoAuthor = $normalizeSeoText($__env->yieldContent('author', $portfolio['name']));
+        $ogType = $normalizeSeoText($__env->yieldContent('og_type', 'website'));
+        $ogTitle = $normalizeSeoText($__env->yieldContent('og_title', $seoTitle));
+        $ogDescription = $normalizeSeoText($__env->yieldContent('og_description', $seoDescription));
+        $ogUrl = $normalizeSeoText($__env->yieldContent('og_url', $seoCanonical));
+        $twitterCard = $normalizeSeoText($__env->yieldContent('twitter_card', 'summary_large_image'));
+        $twitterTitle = $normalizeSeoText($__env->yieldContent('twitter_title', $seoTitle));
+        $twitterDescription = $normalizeSeoText($__env->yieldContent('twitter_description', $seoDescription));
+        $twitterImage = $normalizeSeoText($__env->yieldContent('twitter_image', $seoImage));
+        $twitterUrl = $normalizeSeoText($__env->yieldContent('twitter_url', $seoCanonical));
         $seoRobots = app()->environment('production')
             ? $__env->yieldContent('robots', 'index, follow')
             : 'noindex, nofollow';
@@ -46,6 +61,8 @@
         ]);
     @endphp
 
+    <meta name="app-commit" content="{{ $deployment['commit'] ?? '' }}">
+    <meta name="app-release" content="{{ $deployment['release'] ?? '' }}">
     <title>{{ $seoTitle }}</title>
     <link rel="icon" href="{{ asset($portfolio['profile_image']) }}" type="image/jpeg">
     @foreach ($preloadFonts as $font)
@@ -53,22 +70,22 @@
     @endforeach
 
     <meta name="description" content="{{ $seoDescription }}">
-    <meta name="author" content="{{ $__env->yieldContent('author', $portfolio['name']) }}">
+    <meta name="author" content="{{ $seoAuthor }}">
     <link rel="canonical" href="{{ $seoCanonical }}">
 
-    <meta property="og:type" content="{{ $__env->yieldContent('og_type', 'website') }}">
-    <meta property="og:title" content="{{ $__env->yieldContent('og_title', $seoTitle) }}">
-    <meta property="og:description" content="{{ $__env->yieldContent('og_description', $seoDescription) }}">
+    <meta property="og:type" content="{{ $ogType }}">
+    <meta property="og:title" content="{{ $ogTitle }}">
+    <meta property="og:description" content="{{ $ogDescription }}">
     <meta property="og:image" content="{{ $seoImage }}">
-    <meta property="og:url" content="{{ $__env->yieldContent('og_url', $seoCanonical) }}">
+    <meta property="og:url" content="{{ $ogUrl }}">
     <meta property="og:site_name" content="{{ $portfolio['name'] }}">
     <meta property="og:locale" content="en_US">
 
-    <meta name="twitter:card" content="{{ $__env->yieldContent('twitter_card', 'summary_large_image') }}">
-    <meta name="twitter:title" content="{{ $__env->yieldContent('twitter_title', $seoTitle) }}">
-    <meta name="twitter:description" content="{{ $__env->yieldContent('twitter_description', $seoDescription) }}">
-    <meta name="twitter:image" content="{{ $__env->yieldContent('twitter_image', $seoImage) }}">
-    <meta name="twitter:url" content="{{ $__env->yieldContent('twitter_url', $seoCanonical) }}">
+    <meta name="twitter:card" content="{{ $twitterCard }}">
+    <meta name="twitter:title" content="{{ $twitterTitle }}">
+    <meta name="twitter:description" content="{{ $twitterDescription }}">
+    <meta name="twitter:image" content="{{ $twitterImage }}">
+    <meta name="twitter:url" content="{{ $twitterUrl }}">
     <meta name="robots" content="{{ $seoRobots }}">
     <meta name="googlebot" content="{{ $seoRobots }}">
 

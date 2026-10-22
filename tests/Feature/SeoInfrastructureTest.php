@@ -165,6 +165,8 @@ test('production public pages stay indexable and use the canonical host', functi
 
     $this->get('/')
         ->assertOk()
+        ->assertSee('<title>'.e(config('portfolio.name').' | '.config('portfolio.role')).'</title>', false)
+        ->assertDontSee('&amp;amp;')
         ->assertSee('<link rel="canonical" href="https://canonical.example/">', false)
         ->assertSee('<meta name="robots" content="index, follow">', false)
         ->assertDontSee('noindex');
