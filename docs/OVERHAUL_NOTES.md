@@ -143,6 +143,9 @@ old branch.
   rolls back rather than reporting success. This guard prevents silent
   regressions, but unattended activation remains dependent on a supported,
   narrowly scoped Litehost restart integration.
+  Litehost's own [GitHub shared-hosting guide](https://getlitehost.com/guides/deploy-from-github/)
+  documents restarting the website container after deploying long-lived
+  workers; the production restart behavior was reproduced in this incident.
 - The first two guarded deployment attempts stopped before migration or
   activation: Litehost PHP CLI rejects both `php -` and `/dev/stdin`. The
   workflow now invokes the checked-in `scripts/validate-release.php` from the
@@ -160,7 +163,16 @@ old branch.
   candidates but correctly failed their browser smoke because live Laravel
   continued to serve old HTML and missing asset hashes; both rolled back. The
   physical public-root experiment also failed and its workflow behavior was
-  reverted. Restarting the Litehost container after rollback restored the
-  styled homepage in the live browser. Latest corrective source is on `main`,
-  but its candidate is not the active production release until one passes the
-  post-activation browser smoke.
+  reverted. Run `39848489457` then stopped before activation because the Litehost
+  remote Bash had no usable `/dev/fd` for process substitution; a temporary
+  file list fixed that environment-specific constraint. Run `39848794375`
+  passed. Its first browser check saw stale runtime output, the website
+  container was restarted from the Litehost panel during the retry window, and
+  the next check passed for commit `3ef9181922a2714d0d5aabd1df5cb06720446068`
+  in release `20261022202708-39848794375-1`. It verified all 39 manifest
+  assets, page metadata/rendering, Vue islands, navigation, responsive
+  overflow, SEO endpoints, `/up`, and expected 404 behavior. No migration was
+  pending. Cleanup retained the active and immediately previous releases.
+  Documentation-only pushes are excluded from production deployment; pushes
+  that change application or deployment code still go through the full smoke
+  and rollback gate.
