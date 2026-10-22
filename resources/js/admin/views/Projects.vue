@@ -1,196 +1,132 @@
 <template>
   <Layout page-title="Projects">
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h3 class="text-lg font-semibold text-slate-950">Project Library</h3>
-          <p class="mt-1 text-sm text-slate-500">Manage portfolio case studies and featured work.</p>
+      <PageHeader title="Projects" description="Manage your public case studies, featured work and display order.">
+        <template #actions><Button @click="$router.push('/admin/projects/create')">Add project</Button></template>
+      </PageHeader>
+
+      <Card class="space-y-4 p-4 sm:p-5">
+        <div class="grid gap-3 md:grid-cols-3">
+          <SearchInput v-model="search" :delay="0" placeholder="Search projects" />
+          <Select id="project-status-filter" v-model="status" aria-label="Filter by status" @change="resetAndFetch"><option value="all">All statuses</option><option value="completed">Completed</option><option value="in-progress">In progress</option><option value="archived">Archived</option></Select>
+          <Select id="project-featured-filter" v-model="featured" aria-label="Filter featured projects" @change="resetAndFetch"><option value="all">Featured and unfeatured</option><option value="true">Featured</option><option value="false">Not featured</option></Select>
         </div>
-        <router-link
-          to="/admin/projects/create"
-          class="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-        >
-          Add Project
-        </router-link>
-      </div>
-      </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-adm-line pt-3">
+          <p class="text-sm text-adm-ink-muted">{{ pageInfo.total }} projects · ordered by portfolio position</p>
+          <p v-if="canReorder" class="text-xs text-adm-ink-muted">Use the arrows to change display order.</p>
+        </div>
+      </Card>
 
-      <AdminLoader
-        v-if="loading"
-        title="Loading projects"
-        message="Fetching portfolio projects and media."
-        :rows="6"
-      />
-
-      <!-- Projects Grid -->
-      <div v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div
-          v-for="project in projects"
-          :key="project.id"
-          class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-        >
-          <div
-            v-if=" project.media.find((m:any) => m.type === 'thumbnail')?.thumbnail"
-            class="h-48 bg-slate-200"
-          >
-            <!--@ts-ignore -->
-            <img
-              :src="'/storage/'+project.media.find((m:any) => m.type === 'thumbnail')?.thumbnail"
-              :alt="project.title"
-              class="w-full h-full object-cover"
-            />
+      <ErrorBanner v-if="error" :message="error" :retry="fetchProjects" />
+      <AdminLoader v-if="loading && projects.length === 0" title="Loading projects" message="Fetching portfolio projects and media." :rows="5" />
+      <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" :aria-busy="loading">
+        <Card v-for="(project, index) in projects" :key="project.id" class="overflow-hidden p-0">
+          <div class="aspect-[16/9] overflow-hidden bg-adm-surface-2">
+            <img v-if="thumbnail(project)" :src="thumbnail(project)" :alt="`${project.title} thumbnail`" loading="lazy" decoding="async" class="h-full w-full object-cover" />
+            <div v-else class="grid h-full place-items-center text-sm text-adm-ink-muted">No thumbnail yet</div>
           </div>
-          <div v-else class="h-48 bg-slate-100 flex items-center justify-center">
-            <span class="text-sm font-medium text-slate-400">No thumbnail</span>
-          </div>
-
-          <div class="p-6">
-            <div class="flex items-start justify-between mb-2">
-              <h3 class="text-lg font-semibold text-slate-950">
-                {{ project.title }}
-              </h3>
-              <span
-                v-if="project.is_featured"
-                class="rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
-              >
-                Featured
-              </span>
+          <div class="space-y-4 p-4 sm:p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0"><h2 class="truncate text-lg font-semibold text-adm-ink">{{ project.title }}</h2><p class="mt-1 line-clamp-2 text-sm text-adm-ink-muted">{{ project.description }}</p></div>
+              <Badge :variant="statusVariant(project.status)">{{ project.status.replace('-', ' ') }}</Badge>
             </div>
-
-            <p class="text-sm text-slate-500 mb-4 line-clamp-2">
-              {{ project.description }}
-            </p>
-
-            <div class="flex items-center space-x-2 mb-4">
-              <span
-                class="rounded px-2 py-1 text-xs font-medium capitalize"
-                :class="getStatusColor(project.status)"
-              >
-                {{ project.status.replace('-', ' ') }}
-              </span>
-            </div>
-
-            <div class="flex flex-wrap gap-2 mb-4">
-              <span
-                v-for="tech in project.technologies.slice(0, 3)"
-                :key="tech"
-                class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
-              >
-                {{ tech }}
-              </span>
-              <span
-                v-if="project.technologies.length > 3"
-                class="px-2 py-1 text-xs text-slate-500"
-              >
-                +{{ project.technologies.length - 3 }}
-              </span>
-            </div>
-
-            <div
-              class="flex justify-between items-center pt-4 border-t border-slate-200"
-            >
-              <div class="flex space-x-2">
-                <a
-                  v-if="project.project_link"
-                  :href="project.project_link"
-                  target="_blank"
-                  class="text-sky-700 hover:text-sky-900"
-                  title="View Project"
-                >
-                  <svg
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </a>
-                <a
-                  v-if="project.github_link"
-                  :href="project.github_link"
-                  target="_blank"
-                  class="text-slate-600 hover:text-slate-900"
-                  title="View on GitHub"
-                >
-                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path
-                      d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                    />
-                  </svg>
-                </a>
-              </div>
-
-              <div class="flex space-x-2">
-                <router-link
-                  :to="`/admin/projects/${project.slug}/edit`"
-                  class="text-sm font-medium text-sky-700 hover:text-sky-900"
-                >
-                  Edit
-                </router-link>
-                <button
-                  @click="deleteProject(project)"
-                  class="text-sm font-medium text-rose-600 hover:text-rose-800"
-                >
-                  Delete
-                </button>
+            <div class="flex flex-wrap gap-2"><Badge v-for="tech in project.technologies.slice(0, 4)" :key="tech">{{ tech }}</Badge><Badge v-if="project.technologies.length > 4">+{{ project.technologies.length - 4 }}</Badge></div>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-adm-line pt-3">
+              <label class="inline-flex min-h-10 items-center gap-2 text-sm text-adm-ink"><input type="checkbox" :checked="project.is_featured" :disabled="workingId === project.id" class="size-4 rounded border-adm-line text-adm-accent focus:ring-adm-focus" @change="setFeatured(project, $event)" />Featured</label>
+              <div class="flex items-center gap-1">
+                <button v-if="canReorder" type="button" class="grid size-10 place-items-center rounded-md border border-adm-line text-adm-ink hover:bg-adm-surface-2 disabled:opacity-40" :disabled="index === 0 || workingId === project.id" :aria-label="`Move ${project.title} up`" @click="move(index, -1)">↑</button>
+                <button v-if="canReorder" type="button" class="grid size-10 place-items-center rounded-md border border-adm-line text-adm-ink hover:bg-adm-surface-2 disabled:opacity-40" :disabled="index === projects.length - 1 || workingId === project.id" :aria-label="`Move ${project.title} down`" @click="move(index, 1)">↓</button>
+                <a class="grid size-10 place-items-center rounded-md px-2 text-sm font-medium text-adm-ink-muted underline-offset-2 hover:text-adm-ink hover:underline" :href="`/projects/${project.slug}`" target="_blank" rel="noopener noreferrer">View</a>
+                <router-link class="grid min-h-10 place-items-center rounded-md px-2 text-sm font-medium text-adm-info-ink underline-offset-2 hover:underline" :to="`/admin/projects/${project.slug}/edit`">Edit</router-link>
+                <Button size="sm" variant="danger" @click="deleteProject(project)">Delete</Button>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
+        <EmptyState v-if="projects.length === 0 && !loading" title="No projects found" description="Change the filters or add a project." />
       </div>
+      <Pagination v-if="pageInfo.total" :page="pageInfo.current_page" :last-page="pageInfo.last_page" :total="pageInfo.total" :from="pageInfo.from ?? undefined" :to="pageInfo.to ?? undefined" @change="changePage" />
     </div>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import Layout from "../components/Layout.vue";
-import AdminLoader from "../components/AdminLoader.vue";
-import api from "../utils/api";
-import type { Project } from "../types";
+import { computed, onMounted, ref, watch } from 'vue'
+import Layout from '../components/Layout.vue'
+import AdminLoader from '../components/AdminLoader.vue'
+import api, { apiErrorMessage } from '../utils/api'
+import type { Project } from '../types'
+import { confirmAction, showToast } from '../ui/feedback'
+import PageHeader from '../ui/PageHeader.vue'
+import Button from '../ui/Button.vue'
+import Card from '../ui/Card.vue'
+import Badge from '../ui/Badge.vue'
+import SearchInput from '../ui/SearchInput.vue'
+import Select from '../ui/Select.vue'
+import Pagination from '../ui/Pagination.vue'
+import EmptyState from '../ui/EmptyState.vue'
+import ErrorBanner from '../ui/ErrorBanner.vue'
 
-const projects = ref<Project[]>([]);
-const loading = ref(true);
+interface Paginated<T> { data:T[]; current_page:number; last_page:number; total:number; from:number|null; to:number|null }
+const projects = ref<Project[]>([])
+const search = ref('')
+const status = ref('all')
+const featured = ref('all')
+const page = ref(1)
+const pageInfo = ref<Paginated<Project>>({ data:[], current_page:1, last_page:1, total:0, from:null, to:null })
+const loading = ref(true)
+const workingId = ref<number|null>(null)
+const error = ref('')
+let searchTimer:ReturnType<typeof setTimeout>
+const canReorder = computed(() => !search.value && status.value === 'all' && featured.value === 'all')
+onMounted(() => { void fetchProjects() })
+watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(resetAndFetch, 300) })
 
-onMounted(async () => {
-  await fetchProjects();
-});
-
-const fetchProjects = async () => {
-  loading.value = true;
+async function fetchProjects() {
+  loading.value = true; error.value = ''
   try {
-    const { data } = await api.get("/admin/projects");
-    projects.value = data.data;
-  } finally {
-    loading.value = false;
-  }
-};
-
-const getStatusColor = (status: string) => {
-  const colors = {
-    completed: "bg-emerald-50 text-emerald-700",
-    "in-progress": "bg-sky-50 text-sky-700",
-    archived: "bg-slate-100 text-slate-700",
-  };
-  return colors[status as keyof typeof colors] || "bg-slate-100 text-slate-700";
-};
-
-const deleteProject = async (project: Project) => {
-  if (!confirm(`Are you sure you want to delete "${project.title}"?`)) return;
-
+    const { data } = await api.get('/admin/projects', { params:{ search:search.value || undefined, status:status.value, is_featured:featured.value, page:page.value, per_page:50 } })
+    pageInfo.value = data
+    projects.value = data.data
+  } catch (reason) { error.value = apiErrorMessage(reason) }
+  finally { loading.value = false }
+}
+function resetAndFetch() { page.value = 1; void fetchProjects() }
+function changePage(next:number) { page.value = next; void fetchProjects() }
+function thumbnail(project:Project) {
+  const media = (project.media || []).find((item:any) => item.type === 'thumbnail')
+  const path = media?.thumbnail || media?.url
+  if (!path) return ''
+  return String(path).startsWith('http') || String(path).startsWith('/') ? path : `/storage/${path}`
+}
+function statusVariant(value:string) { return value === 'completed' ? 'success' : value === 'in-progress' ? 'info' : 'neutral' }
+async function setFeatured(project:Project, event:Event) {
+  const value = (event.target as HTMLInputElement).checked
+  workingId.value = project.id || null
   try {
-    await api.delete(`/admin/projects/${project.slug}`);
-    await fetchProjects();
-  } catch (error) {
-    alert((error as any).response?.data?.message || "An error occurred");
-  }
-};
+    await api.patch(`/admin/projects/${project.id}/featured`, { is_featured:value })
+    project.is_featured = value
+    showToast(value ? 'Project featured.' : 'Project unfeatured.')
+    if (featured.value !== 'all') await fetchProjects()
+  } catch (reason) { (event.target as HTMLInputElement).checked = !value; showToast(apiErrorMessage(reason), 'error') }
+  finally { workingId.value = null }
+}
+async function move(index:number, direction:-1|1) {
+  const next = index + direction
+  if (next < 0 || next >= projects.value.length) return
+  const reordered = [...projects.value]
+  ;[reordered[index], reordered[next]] = [reordered[next], reordered[index]]
+  workingId.value = reordered[next]?.id || null
+  try {
+    await api.post('/admin/projects/reorder', { projects:reordered.map((item, order) => ({ id:item.id, order:order + 1 })) })
+    projects.value = reordered
+    showToast('Project order saved.')
+  } catch (reason) { showToast(apiErrorMessage(reason), 'error') }
+  finally { workingId.value = null }
+}
+async function deleteProject(project:Project) {
+  if (!await confirmAction(`Delete “${project.title}”? This removes the project from the portfolio.`)) return
+  try { await api.delete(`/admin/projects/${project.slug}`); await fetchProjects(); showToast('Project deleted.') }
+  catch (reason) { showToast(apiErrorMessage(reason), 'error') }
+}
 </script>
