@@ -4,6 +4,7 @@ namespace App\Support\Seo;
 
 use App\Models\Post;
 use App\Models\Project;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
@@ -72,6 +73,77 @@ class SitemapUrlDiscovery
         return array_values($urls);
     }
 
+    /**
+     * Return a canonical URL for a route that participates in the public SEO
+     * contract. This also supports URLs that have just been removed from the
+     * sitemap, such as a former post slug being reported as unavailable.
+     */
+    public function publicRouteUrl(string $name, array $parameters = []): string
+    {
+        $route = Route::getRoutes()->getByName($name);
+
+        if (! $route || ! Str::startsWith((string) $route->getName(), self::PUBLIC_ROUTE_PREFIX)) {
+            throw new \InvalidArgumentException('The route is not part of the public SEO routes.');
+        }
+
+        if (! in_array('GET', $route->methods(), true)
+            || $this->hasExcludedPath($route->uri())
+            || str_contains($route->getActionName(), 'RedirectController')
+            || $this->hasRestrictedMiddleware($route)
+            || ($route->getDomain() && preg_match('/\{[^}]+\}/', $route->getDomain()))
+        ) {
+            throw new \InvalidArgumentException('The route is not eligible for public discovery.');
+        }
+
+        $expected = $route->parameterNames();
+        $provided = array_keys($parameters);
+        sort($expected);
+        sort($provided);
+
+        if ($expected !== $provided) {
+            throw new \InvalidArgumentException('The route parameters do not match its public route definition.');
+        }
+
+        return app(CanonicalUrl::class)->forRoute($name, $parameters);
+    }
+
+    public function publicStaticRouteUrl(string $name): string
+    {
+        $route = Route::getRoutes()->getByName($name);
+
+        if (! $route || ! $this->isEligibleStaticRoute($route)) {
+            throw new \InvalidArgumentException('The route is not an eligible public static route.');
+        }
+
+        return $this->publicRouteUrl($name);
+    }
+
+    public function isEligiblePublicUrl(string $url): bool
+    {
+        $request = Request::create($url, 'GET');
+
+        foreach (Route::getRoutes() as $route) {
+            $name = $route->getName();
+
+            if (! $name
+                || ! Str::startsWith($name, self::PUBLIC_ROUTE_PREFIX)
+                || ! in_array('GET', $route->methods(), true)
+                || $this->hasExcludedPath($route->uri())
+                || str_contains($route->getActionName(), 'RedirectController')
+                || $this->hasRestrictedMiddleware($route)
+                || ($route->getDomain() && preg_match('/\{[^}]+\}/', $route->getDomain()))
+            ) {
+                continue;
+            }
+
+            if ($route->matches($request)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isEligibleStaticRoute(RoutingRoute $route): bool
     {
         $name = $route->getName();
@@ -92,19 +164,24 @@ class SitemapUrlDiscovery
             return false;
         }
 
+        return ! $this->hasRestrictedMiddleware($route);
+    }
+
+    private function hasRestrictedMiddleware(RoutingRoute $route): bool
+    {
         foreach ($route->gatherMiddleware() as $middleware) {
             if (preg_match('/^(auth|guest|verified|can|signed|password\.confirm)(:|$)/', $middleware)) {
-                return false;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
     private function hasExcludedPath(string $uri): bool
     {
         $excludedSegments = [
-            'admin', 'api', 'auth', 'debug', 'diagnostic', 'diagnostics', 'error',
+            '_design', 'admin', 'api', 'auth', 'debug', 'diagnostic', 'diagnostics', 'error',
             'errors', 'health', 'health-check', 'internal', 'login', 'logout',
             'metrics', 'password', 'register', 'robots.txt', 'search', 'sitemap.xml',
             'storage', 'up',

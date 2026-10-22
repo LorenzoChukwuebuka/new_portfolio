@@ -13,9 +13,26 @@ Route::get('/projects/{slug}', [SiteController::class, 'show_project_view'])->na
 Route::get('/blog', [SiteController::class, 'show_blog_posts_view'])->name('seo.public.blog.index');
 Route::get('/blog/{slug}', [SiteController::class, 'show_blog_post_view'])->name('seo.public.blog.show');
 Route::get('/cv/download', [ContactController::class, 'downloadActiveCv'])->name('cv.download.active');
+Route::get('/_design', function () {
+    abort_unless(app()->environment('local'), 404);
+
+    return view('design');
+})->name('seo.public.design');
 
 Route::get('/sitemap.xml', SitemapController::class)->name('seo.infrastructure.sitemap');
 Route::get('/robots.txt', RobotsController::class)->name('seo.infrastructure.robots');
+Route::get('/{indexNowKey}.txt', function (string $indexNowKey) {
+    $configuredKey = (string) config('indexnow.key');
+
+    abort_unless(hash_equals($configuredKey, $indexNowKey), 404);
+
+    return response($configuredKey, 200, [
+        'Content-Type' => 'text/plain; charset=UTF-8',
+        'Cache-Control' => 'public, max-age=3600',
+        'X-Content-Type-Options' => 'nosniff',
+    ]);
+})->where('indexNowKey', '[A-Za-z0-9-]{8,128}')
+    ->name('seo.infrastructure.indexnow-key');
 
 Route::view('/admin', 'admin')->name('admin.app');
 Route::get('/admin/{any}', function () {
