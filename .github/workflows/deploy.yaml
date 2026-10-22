@@ -495,7 +495,7 @@ jobs:
           fi
 
           PHASE="remote Vite manifest and release consistency validation"
-          php - "$RELEASE_DIR" "$GITHUB_SHA" "$RELEASE" <<'PHP'
+          php /dev/stdin "$RELEASE_DIR" "$GITHUB_SHA" "$RELEASE" <<'PHP'
           <?php
           [$releaseDir, $commit, $release] = array_slice($argv, 1);
           $buildDir = $releaseDir.'/public/build';

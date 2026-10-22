@@ -129,6 +129,12 @@ old branch.
   `SMOKE_BASE_URL` checks, while the deploy job requires production indexability
   and the exact workflow commit. Playwright is a development-only dependency
   used by CI, not a production runtime dependency.
+- The first guarded deployment attempt stopped before migration or activation:
+  Litehost PHP CLI rejects `php -` even when the validator is provided on
+  standard input. The workflow now invokes that same validator with
+  `php /dev/stdin`; the exact command and extracted candidate validator were
+  exercised against a matching release fixture. The failure left the prior
+  release active and its rollback check confirmed it was unchanged.
 - A separate live metadata check found double-escaped entities in the page
   title/social metadata. The shared public Blade layout now normalizes one
   already-escaped layer before its normal escaped output; the SEO feature test
