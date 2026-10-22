@@ -6,7 +6,7 @@
       </PageHeader>
       <div v-if="hasDraft" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-adm-warning-ink/25 bg-adm-warning-bg p-4 text-sm text-adm-warning-ink"><p>A local draft was saved {{ draftTimestamp }}.</p><div class="flex gap-2"><Button variant="secondary" @click="restoreDraft">Restore draft</Button><Button variant="ghost" @click="clearDraft">Dismiss</Button></div></div>
       <ErrorBanner v-if="failure" class="mb-4" :message="failure"/>
-      <form class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]" @submit.prevent="savePost()">
+      <form id="post-form" class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]" @submit.prevent="savePost()">
         <div class="grid min-w-0 gap-5">
           <Card><div class="grid gap-4"><Field id="post-title" label="Title" required :error="errors.title"><Input id="post-title" v-model="form.title" :error="errors.title" placeholder="A clear, specific headline" autocomplete="off"/></Field><Field id="post-slug" label="URL slug" hint="Edit manually or use Reset to follow the title."><div class="flex gap-2"><Input id="post-slug" v-model="form.slug" placeholder="generated-from-title" @update:model-value="slugWasEdited=true"/><Button variant="secondary" @click="resetSlug">Reset</Button></div></Field><Field id="post-excerpt" label="Excerpt" required :error="errors.excerpt"><Textarea id="post-excerpt" v-model="form.excerpt" :error="errors.excerpt" :rows="3" placeholder="Summarize the writeup in a couple of sentences."/><p class="text-right text-xs text-adm-ink-muted">{{ form.excerpt.length }} characters</p></Field></div></Card>
           <Card><div class="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 class="text-base font-semibold">Writeup</h2><p class="text-xs text-adm-ink-muted">Headings · lists · links · code · images</p></div><Field id="post-content" label="Article body" required :error="errors.content"><div ref="editorContainer" class="admin-quill-editor"/><p v-if="errors.content" class="mt-2 text-sm text-adm-danger-ink">{{ errors.content }}</p></Field></Card>
@@ -19,8 +19,8 @@
           <Card><h2 class="mb-3 text-base font-semibold">Featured image</h2><ImageUpload :existing="featuredImageUrl" @update:file="form.featured_image=$event" @remove-existing="removeFeaturedImage=$event"/><p v-if="form.featured_image" class="mt-2 truncate text-xs text-adm-ink-muted">Selected: {{ form.featured_image.name }}</p></Card>
           <Card><p class="eyebrow text-adm-ink-muted">Search preview</p><div class="mt-2 grid gap-1"><p class="truncate text-sm font-semibold text-adm-info-ink">{{ seoTitle || 'Your article title' }}</p><p class="truncate text-xs text-adm-success-ink">{{ seoUrl }}</p><p class="line-clamp-2 text-xs text-adm-ink-muted">{{ seoDescription || 'Your excerpt will appear in search results.' }}</p></div></Card>
         </aside>
-        <div class="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-adm-line bg-adm-surface/95 p-3 backdrop-blur xl:hidden"><Button class="flex-1" variant="secondary" @click="savePost(false)">Save draft</Button><Button class="flex-1" @click="savePost(true)">{{ form.status==='published'?'Update':'Publish' }}</Button></div>
       </form>
+      <Teleport to="body"><div class="fixed inset-x-0 bottom-0 z-[var(--z-action-bar)] flex gap-2 border-t border-adm-line bg-adm-surface/95 p-3 backdrop-blur xl:hidden"><Button class="flex-1" variant="secondary" @click="savePost(false)">Save draft</Button><Button class="flex-1" @click="savePost(true)">{{ form.status==='published'?'Update':'Publish' }}</Button></div></Teleport>
     </div>
   </Layout>
 </template>

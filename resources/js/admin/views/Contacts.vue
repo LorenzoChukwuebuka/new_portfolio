@@ -311,7 +311,7 @@
 
     <!-- Message Detail Modal -->
     <TransitionRoot :show="isModalOpen" as="template">
-      <Dialog @close="closeModal" class="relative z-50">
+      <Dialog @close="closeModal" class="relative z-[var(--z-modal)]">
         <TransitionChild
           enter="ease-out duration-300"
           enter-from="opacity-0"
