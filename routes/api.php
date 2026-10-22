@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\TagController;
+use App\Http\Controllers\Admin\UploadController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BlogCommentController;
 use App\Http\Controllers\ContactController;
@@ -32,6 +33,11 @@ Route::post("/posts/{post}/comments", [BlogCommentController::class, "store"]);
 Route::get("/projects/{project}", [SiteController::class, "show_project"]);
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+    Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:20,1');
+    Route::post('/projects/reorder', [ProjectController::class, 'reorder']);
+    Route::patch('/projects/{project:id}/featured', [ProjectController::class, 'setFeatured']);
+    Route::post('/cv/{cv:id}/active', [CvController::class, 'setActive']);
+    Route::patch('/posts/{post:slug}/status', [PostController::class, 'setStatus']);
     Route::apiResource("categories", CategoryController::class);
     Route::apiResource("tags", TagController::class);
     Route::apiResource("projects", ProjectController::class);

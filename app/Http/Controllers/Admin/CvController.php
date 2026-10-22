@@ -11,9 +11,12 @@ class CvController extends Controller
     /**
      * Display a listing of CVs.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $cvs = Cv::orderBy('created_at', 'desc')->paginate(15);
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+        ]);
+        $cvs = Cv::orderBy('created_at', 'desc')->paginate((int) ($validated['per_page'] ?? 15));
 
         return response()->json($cvs);
     }
@@ -27,15 +30,15 @@ class CvController extends Controller
             'title'       => 'required|string|max:255',
             'version'     => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'is_active'   => 'string',
+            'is_active'   => ['sometimes', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! in_array($value, [true, false, 0, 1, '0', '1', 'true', 'false'], true)) {
+                    $fail('The active status must be true or false.');
+                }
+            }],
             'file'        => 'required|file|mimes:pdf,doc,docx|max:10240', // 10MB
         ]);
 
-        if ($validated['is_active'] === 'true') {
-            $validated['is_active'] = true;
-        } else {
-            $validated['is_active'] = false;
-        }
+        $validated['is_active'] = filter_var($validated['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         // Handle file upload
         $file     = $request->file('file');
@@ -82,9 +85,17 @@ class CvController extends Controller
             'title'       => 'required|string|max:255',
             'version'     => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'is_active'   => 'boolean',
+            'is_active'   => ['sometimes', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! in_array($value, [true, false, 0, 1, '0', '1', 'true', 'false'], true)) {
+                    $fail('The active status must be true or false.');
+                }
+            }],
             'file'        => 'nullable|file|mimes:pdf,doc,docx|max:10240',
         ]);
+
+        if (array_key_exists('is_active', $validated)) {
+            $validated['is_active'] = filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
+        }
 
         // Handle file replacement if new file uploaded
         if ($request->hasFile('file')) {

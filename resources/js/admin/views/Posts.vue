@@ -1,202 +1,68 @@
 <template>
   <Layout page-title="Posts">
-    <div class="space-y-6">
-      <!-- Header -->
-      <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div>
-            <h3 class="text-lg font-semibold text-slate-950">Content Library</h3>
-            <p class="mt-1 text-sm text-slate-500">
-              Draft, publish, and manage portfolio articles.
-            </p>
-          </div>
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            v-model="search"
-            @input="fetchPosts"
-            type="search"
-            placeholder="Search posts..."
-            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10 sm:w-64"
-          />
-          <select
-            v-model="filter"
-            @change="fetchPosts"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
-          >
-            <option value="">All Posts</option>
-            <option value="published">Published</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
-          <router-link
-            to="/admin/posts/create"
-            class="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
-            Add Post
-          </router-link>
-          </div>
+    <div class="admin-page">
+      <PageHeader title="Posts" description="Draft, publish, and manage the articles in your portfolio.">
+        <template #actions><router-link to="/admin/posts/create" class="inline-flex min-h-10 items-center gap-2 rounded-md bg-adm-accent-bg px-4 py-2 text-sm font-semibold text-adm-accent-ink"><Icon name="plus" class-name="h-4 w-4"/>New post</router-link></template>
+      </PageHeader>
+      <Card>
+        <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <SearchInput v-model="search" label="Search posts" placeholder="Search title, excerpt, or content…"/>
+          <label class="sr-only" for="post-status">Filter posts by status</label><select id="post-status" v-model="filter" class="min-h-11 rounded-md border border-adm-line bg-adm-surface px-3 text-sm text-adm-ink" @change="page=1;fetchPosts()"><option value="">All posts</option><option value="published">Published</option><option value="draft">Draft</option><option value="archived">Archived</option></select>
         </div>
-      </div>
-
-      <AdminLoader
-        v-if="loading"
-        title="Loading posts"
-        message="Fetching articles from the database."
-        :rows="6"
-      />
-
-      <!-- Posts Table -->
-      <div v-else class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-200">
-            <thead class="bg-slate-50">
-              <tr>
-                <th
-                  class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
-                >
-                  Title
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
-                >
-                  Category
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
-                >
-                  Status
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
-                >
-                  Views
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
-                >
-                  Date
-                </th>
-                <th
-                  class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 bg-white">
-              <tr v-for="post in posts" :key="post.id" class="hover:bg-slate-50">
-                <td class="px-6 py-4">
-                  <div class="text-sm font-semibold text-slate-950">
-                    {{ post.title }}
-                  </div>
-                  <div class="mt-1 max-w-xl text-sm text-slate-500">
-                    {{ post.excerpt?.substring(0, 60) }}...
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm text-slate-500">
-                    {{ post.category?.name || "Uncategorized" }}
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span
-                    class="rounded px-2 py-1 text-xs font-medium capitalize"
-                    :class="getStatusColor(post.status)"
-                  >
-                    {{ post.status }}
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                  {{ post.views_count || 0 }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                  {{ formatDate(post.created_at) }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2"
-                >
-                  <router-link
-                    :to="`/admin/posts/${post.slug}/edit`"
-                    class="text-sky-700 hover:text-sky-900"
-                  >
-                    Edit
-                  </router-link>
-                  <button
-                    @click="deletePost(post)"
-                    class="text-rose-600 hover:text-rose-800"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="posts.length === 0">
-                <td colspan="6" class="px-6 py-12 text-center text-sm text-slate-500">
-                  No posts found.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <p v-if="loading && posts.length" class="mt-3 text-xs text-adm-ink-muted" role="status">Updating results…</p>
+        <ErrorBanner v-if="error" class="mt-4" :message="error" :retry="fetchPosts"/>
+        <div class="mt-4">
+          <DataTable :columns="columns" :rows="posts">
+            <template #row="{row}">
+              <td class="max-w-[34rem] px-4 py-4"><router-link class="font-semibold text-adm-ink hover:text-adm-accent" :to="`/admin/posts/${row.slug}/edit`">{{ row.title }}</router-link><p class="mt-1 truncate text-xs text-adm-ink-muted">{{ row.excerpt }}</p></td>
+              <td class="px-4 py-4 text-adm-ink-muted">{{ row.category?.name || 'Uncategorized' }}</td>
+              <td class="px-4 py-4"><Badge :variant="statusVariant(row.status)">{{ row.status }}</Badge></td>
+              <td class="px-4 py-4 text-adm-ink-muted">{{ row.views_count || 0 }}</td>
+              <td class="px-4 py-4 text-adm-ink-muted">{{ formatDate(row.published_at || row.created_at) }}</td>
+              <td class="px-4 py-4 text-right"><div class="flex justify-end gap-3"><a v-if="row.status==='published'" class="text-sm text-adm-ink-muted underline" :href="`/blog/${row.slug}`" target="_blank" rel="noopener noreferrer">View</a><router-link class="text-sm font-semibold text-adm-accent" :to="`/admin/posts/${row.slug}/edit`">Edit</router-link><details class="relative text-left"><summary class="min-h-9 cursor-pointer rounded px-2 py-1 text-sm text-adm-ink-muted hover:bg-adm-surface-2">More</summary><div class="absolute right-0 z-20 mt-1 grid min-w-40 rounded-md border border-adm-line bg-adm-surface p-1 shadow-adm-card"><button v-if="row.status!=='published'" class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="changeStatus(row,'published')">Publish</button><button v-if="row.status!=='draft'" class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="changeStatus(row,'draft')">Move to draft</button><button v-if="row.status!=='archived'" class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="changeStatus(row,'archived')">Archive</button><button class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="duplicatePost(row)">Duplicate</button><button class="rounded px-3 py-2 text-left text-sm text-adm-danger-ink hover:bg-adm-danger-bg" @click="deletePost(row)">Delete</button></div></details></div></td>
+            </template>
+            <template #mobile="{row}">
+              <div class="flex items-start justify-between gap-3"><div class="min-w-0"><router-link class="font-semibold text-adm-ink" :to="`/admin/posts/${row.slug}/edit`">{{ row.title }}</router-link><p class="mt-1 text-xs text-adm-ink-muted">{{ row.category?.name || 'Uncategorized' }} · {{ formatDate(row.published_at || row.created_at) }}</p></div><Badge :variant="statusVariant(row.status)">{{ row.status }}</Badge></div>
+              <p class="mt-2 line-clamp-2 text-sm text-adm-ink-muted">{{ row.excerpt }}</p><div class="mt-3 flex flex-wrap items-center justify-between gap-3"><span class="text-xs text-adm-ink-muted">{{ row.views_count || 0 }} views</span><div class="flex flex-wrap gap-3"><a v-if="row.status==='published'" class="text-sm underline" :href="`/blog/${row.slug}`" target="_blank" rel="noopener noreferrer">View</a><router-link class="text-sm font-semibold text-adm-accent" :to="`/admin/posts/${row.slug}/edit`">Edit</router-link><details class="relative"><summary class="min-h-9 cursor-pointer rounded px-2 py-1 text-sm text-adm-ink-muted">More</summary><div class="absolute right-0 z-20 mt-1 grid min-w-40 rounded-md border border-adm-line bg-adm-surface p-1 shadow-adm-card"><button v-if="row.status!=='published'" class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="changeStatus(row,'published')">Publish</button><button v-if="row.status!=='draft'" class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="changeStatus(row,'draft')">Move to draft</button><button v-if="row.status!=='archived'" class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="changeStatus(row,'archived')">Archive</button><button class="rounded px-3 py-2 text-left text-sm hover:bg-adm-surface-2" @click="duplicatePost(row)">Duplicate</button><button class="rounded px-3 py-2 text-left text-sm text-adm-danger-ink hover:bg-adm-danger-bg" @click="deletePost(row)">Delete</button></div></details></div></div>
+            </template>
+            <template #empty><EmptyState title="No posts found" description="Change the filters or start a new writeup."/></template>
+          </DataTable>
         </div>
-      </div>
+        <Pagination v-if="meta" class="mt-4" :page="meta.current_page" :last-page="meta.last_page" :total="meta.total" :from="meta.from" :to="meta.to" @change="changePage"/>
+      </Card>
     </div>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import Layout from "../components/Layout.vue";
-import AdminLoader from "../components/AdminLoader.vue";
-import api from "../utils/api";
-import type { Post } from "../types";
+import { onMounted, ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import Layout from '../components/Layout.vue'
+import api, { apiErrorMessage } from '../utils/api'
+import { useConfirm } from '../ui/useConfirm'
+import { useToast } from '../ui/useToast'
+import Badge from '../ui/Badge.vue'
+import Card from '../ui/Card.vue'
+import DataTable from '../ui/DataTable.vue'
+import EmptyState from '../ui/EmptyState.vue'
+import ErrorBanner from '../ui/ErrorBanner.vue'
+import Icon from '../ui/Icon.vue'
+import PageHeader from '../ui/PageHeader.vue'
+import Pagination from '../ui/Pagination.vue'
+import SearchInput from '../ui/SearchInput.vue'
 
-const posts = ref<Post[]>([]);
-const filter = ref("");
-const search = ref("");
-const loading = ref(true);
-
-onMounted(async () => {
-  await fetchPosts();
-});
-
-const fetchPosts = async () => {
-  const params: Record<string, string> = {};
-  if (filter.value) params.status = filter.value;
-  if (search.value) params.search = search.value;
-  loading.value = true;
-  try {
-    const { data } = await api.get("/admin/posts", { params });
-    posts.value = data.data;
-  } finally {
-    loading.value = false;
-  }
-};
-
-const getStatusColor = (status: string) => {
-  const colors = {
-    published: "bg-emerald-50 text-emerald-700",
-    draft: "bg-amber-50 text-amber-700",
-    archived: "bg-slate-100 text-slate-700",
-  };
-  return colors[status as keyof typeof colors] || "bg-slate-100 text-slate-700";
-};
-
-const formatDate = (date?: string) => {
-  if (!date) return "-";
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
-
-const deletePost = async (post: Post) => {
-  if (!confirm(`Are you sure you want to delete "${post.title}"?`)) return;
-
-  try {
-    await api.delete(`/admin/posts/${post.slug}`);
-    await fetchPosts();
-  } catch (error:any) {
-    alert(error.response?.data?.message || "An error occurred");
-  }
-};
+interface PostRow { id:number; title:string; slug:string; excerpt:string; status:string; views_count:number; created_at:string; published_at?:string|null; category?:{name:string}|null }
+const route=useRoute();const router=useRouter();const askConfirm=useConfirm();const toast=useToast()
+const posts=ref<PostRow[]>([]);const search=ref('');const filter=ref(String(route.query.status||''));const loading=ref(true);const error=ref('');const page=ref(1);const meta=ref<{current_page:number;last_page:number;total:number;from:number;to:number}|null>(null)
+const columns=[{key:'title',label:'Post'},{key:'category',label:'Category'},{key:'status',label:'Status'},{key:'views_count',label:'Views'},{key:'published_at',label:'Date'},{key:'actions',label:'Actions'}]
+let timer:ReturnType<typeof setTimeout>|undefined
+watch(search,()=>{clearTimeout(timer);timer=setTimeout(()=>{page.value=1;void fetchPosts()},300)})
+onMounted(()=>{void fetchPosts()})
+async function fetchPosts(){loading.value=true;error.value='';try{const {data}=await api.get('/admin/posts',{params:{search:search.value||undefined,status:filter.value||undefined,page:page.value,per_page:15}});posts.value=data.data;meta.value={current_page:data.current_page,last_page:data.last_page,total:data.total,from:data.from||0,to:data.to||0}}catch(e){error.value=apiErrorMessage(e,'Posts could not be loaded.')}finally{loading.value=false}}
+async function changePage(next:number){page.value=next;await router.replace({query:{...route.query,page:String(next)}});void fetchPosts()}
+async function changeStatus(post:PostRow,status:'draft'|'published'|'archived'){try{await api.patch(`/admin/posts/${post.slug}/status`,{status});toast(`Post moved to ${status}.`);await fetchPosts()}catch(error){toast(apiErrorMessage(error,'Post status could not be changed.'),'error')}}
+async function duplicatePost(post:PostRow){try{const {data:original}=await api.get(`/admin/posts/${post.slug}`);const suffix=Math.random().toString(36).slice(2,6);const body={category_id:original.category_id,title:`${original.title} (copy)`,slug:`${original.slug}-copy-${suffix}`,excerpt:original.excerpt,content:original.content,author:original.author,read_time:original.read_time,status:'draft',published_at:null,meta_data:original.meta_data||{},tags:(original.tags||[]).map((tag:{id:number})=>tag.id)};await api.post('/admin/posts',body);toast('Draft copy created.');page.value=1;await fetchPosts()}catch(error){toast(apiErrorMessage(error,'The post could not be duplicated.'),'error')}}
+function statusVariant(value:string){return value==='published'?'success':value==='draft'?'warning':value==='archived'?'neutral':'info'}
+function formatDate(value?:string|null){return value?new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'—'}
+async function deletePost(post:PostRow){if(!await askConfirm(`Delete “${post.title}”? This cannot be undone.`, 'Delete post?'))return;try{await api.delete(`/admin/posts/${post.slug}`);toast('Post deleted.');if(posts.value.length===1&&page.value>1)page.value--;await fetchPosts()}catch(e){toast(apiErrorMessage(e,'Post could not be deleted.'),'error')}}
 </script>

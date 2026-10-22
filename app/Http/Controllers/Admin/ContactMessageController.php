@@ -13,6 +13,10 @@ class ContactMessageController extends Controller
      */
     public function index(Request $request)
     {
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+        ]);
+
         $query = ContactMessage::query();
 
         // Filter by status
@@ -30,7 +34,7 @@ class ContactMessageController extends Controller
             });
         }
 
-        $messages = $query->orderBy('created_at', 'desc')->paginate(15);
+        $messages = $query->orderBy('created_at', 'desc')->paginate((int) ($validated['per_page'] ?? 15));
 
         return response()->json($messages);
     }

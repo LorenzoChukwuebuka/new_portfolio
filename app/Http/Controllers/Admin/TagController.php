@@ -14,6 +14,9 @@ class TagController extends Controller
      */
     public function index(Request $request)
     {
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+        ]);
         $query = Tag::withCount(['posts', 'projects']);
 
         // Filter by type
@@ -26,7 +29,7 @@ class TagController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $tags = $query->orderBy('name')->paginate(15);
+        $tags = $query->orderBy('name')->paginate((int) ($validated['per_page'] ?? 15));
 
         return response()->json($tags);
     }
@@ -85,6 +88,12 @@ class TagController extends Controller
      */
     public function destroy(Tag $tag)
     {
+        if ($tag->posts()->exists() || $tag->projects()->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete a tag while it is assigned to posts or projects.',
+            ], 422);
+        }
+
         $tag->delete();
 
         return response()->json([

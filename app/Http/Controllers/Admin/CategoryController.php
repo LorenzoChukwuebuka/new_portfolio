@@ -12,11 +12,14 @@ class CategoryController extends Controller
     /**
      * Display a listing of categories.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+        ]);
         $categories = Category::withCount('posts')
             ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->paginate((int) ($validated['per_page'] ?? 15));
 
         return response()->json($categories);
     }

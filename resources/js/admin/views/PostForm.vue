@@ -1,629 +1,125 @@
 <template>
-  <Layout :page-title="isEditing ? 'Edit Post' : 'Create Post'">
-    <div class="max-w-4xl">
-      <!-- Draft indicator -->
-      <div
-        v-if="hasDraft && !isEditing"
-        class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between"
-      >
-        <div class="flex items-center space-x-2">
-          <svg
-            class="w-5 h-5 text-yellow-600"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          <span class="text-sm font-medium text-yellow-800">
-            You have an unsaved draft from {{ draftTimestamp }}
-          </span>
-        </div>
-        <button
-          @click="clearDraft"
-          type="button"
-          class="text-sm text-yellow-700 hover:text-yellow-900 font-medium"
-        >
-          Clear Draft
-        </button>
-      </div>
-
-      <form @submit.prevent="savePost" class="space-y-6">
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">
-            Basic Information
-          </h3>
-
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Title <span class="text-red-500">*</span>
-              </label>
-              <input
-                v-model="form.title"
-                type="text"
-                required
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Slug
-              </label>
-              <input
-                v-model="form.slug"
-                type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="auto-generated if empty"
-              />
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <select
-                  v-model="form.category_id"
-                  class="w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option :value="undefined">Uncategorized</option>
-                  <option
-                    v-for="category in categories"
-                    :key="category.id"
-                    :value="category.id"
-                  >
-                    {{ category.name }}
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Author
-                </label>
-                <input
-                  v-model="form.author"
-                  type="text"
-                  class="w-full px-3 py-2 border text-gray-900 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Excerpt <span class="text-red-500">*</span>
-              </label>
-              <textarea
-                v-model="form.excerpt"
-                required
-                rows="2"
-                class="w-full px-3 py-2 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Brief summary of the post"
-              />
-            </div>
-
-            <!-- Tags Field -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Tags
-              </label>
-              <select
-                v-model="form.tags"
-                multiple
-                class="w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style="min-height: 100px"
-              >
-                <option v-for="tag in tags" :key="tag.id" :value="tag.id">
-                  {{ tag.name }}
-                </option>
-              </select>
-              <p class="mt-1 text-xs text-gray-500">
-                Hold Ctrl/Cmd to select multiple tags
-              </p>
-            </div>
-          </div>
+  <Layout :page-title="isEditing ? 'Edit post' : 'New post'">
+    <div class="admin-page pb-24 lg:pb-0">
+      <PageHeader :title="isEditing ? 'Edit post' : 'New post'" description="Write, refine, and publish a clear portfolio article." breadcrumb="Content / Posts">
+        <template #actions><Button variant="secondary" @click="savePost(false)">Save draft</Button><Button @click="savePost(true)">{{ form.status==='published'?'Update post':'Publish' }}</Button></template>
+      </PageHeader>
+      <div v-if="hasDraft" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-adm-warning-ink/25 bg-adm-warning-bg p-4 text-sm text-adm-warning-ink"><p>A local draft was saved {{ draftTimestamp }}.</p><div class="flex gap-2"><Button variant="secondary" @click="restoreDraft">Restore draft</Button><Button variant="ghost" @click="clearDraft">Dismiss</Button></div></div>
+      <ErrorBanner v-if="failure" class="mb-4" :message="failure"/>
+      <form class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]" @submit.prevent="savePost()">
+        <div class="grid min-w-0 gap-5">
+          <Card><div class="grid gap-4"><Field id="post-title" label="Title" required :error="errors.title"><Input id="post-title" v-model="form.title" :error="errors.title" placeholder="A clear, specific headline" autocomplete="off"/></Field><Field id="post-slug" label="URL slug" hint="Edit manually or use Reset to follow the title."><div class="flex gap-2"><Input id="post-slug" v-model="form.slug" placeholder="generated-from-title" @update:model-value="slugWasEdited=true"/><Button variant="secondary" @click="resetSlug">Reset</Button></div></Field><Field id="post-excerpt" label="Excerpt" required :error="errors.excerpt"><Textarea id="post-excerpt" v-model="form.excerpt" :error="errors.excerpt" :rows="3" placeholder="Summarize the writeup in a couple of sentences."/><p class="text-right text-xs text-adm-ink-muted">{{ form.excerpt.length }} characters</p></Field></div></Card>
+          <Card><div class="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 class="text-base font-semibold">Writeup</h2><p class="text-xs text-adm-ink-muted">Headings · lists · links · code · images</p></div><Field id="post-content" label="Article body" required :error="errors.content"><div ref="editorContainer" class="admin-quill-editor"/><p v-if="errors.content" class="mt-2 text-sm text-adm-danger-ink">{{ errors.content }}</p></Field></Card>
+          <Card><h2 class="mb-4 text-base font-semibold">Metadata</h2><div class="grid gap-3"><div v-for="row in metaRows" :key="row.id" class="grid gap-2 sm:grid-cols-[1fr_1.3fr_auto]"><Field :id="`meta-key-${row.id}`" label="Key"><Input :id="`meta-key-${row.id}`" v-model="row.key" placeholder="og:title" @blur="syncMeta"/></Field><Field :id="`meta-value-${row.id}`" label="Value"><Input :id="`meta-value-${row.id}`" v-model="row.value" placeholder="Optional value" @blur="syncMeta"/></Field><Button class="self-end" variant="danger" @click="removeMeta(row.id)">Remove</Button></div><Button class="justify-self-start" variant="secondary" @click="addMeta">Add metadata field</Button></div></Card>
         </div>
 
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Content</h3>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Content <span class="text-red-500">*</span>
-            </label>
-            <div
-              ref="editorContainer"
-              class="bg-white border text-gray-900 border-gray-300 rounded-lg"
-            ></div>
-          </div>
-        </div>
-
-        <!-- Metadata Section -->
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Metadata</h3>
-
-          <div class="space-y-3">
-            <div
-              v-for="(value, key, index) in form.meta_data"
-              :key="index"
-              class="flex gap-2"
-            >
-              <input
-                v-model="metaKeys[index]"
-                @blur="updateMetaKey(index, key)"
-                type="text"
-                placeholder="Key"
-                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                v-model="form.meta_data[key]"
-                type="text"
-                placeholder="Value"
-                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                @click="removeMetaField(key)"
-                type="button"
-                class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100"
-              >
-                Remove
-              </button>
-            </div>
-
-            <button
-              @click="addMetaField"
-              type="button"
-              class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
-            >
-              + Add Metadata Field
-            </button>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Publishing</h3>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Status <span class="text-red-500">*</span>
-              </label>
-              <select
-                v-model="form.status"
-                required
-                class="w-full px-3 py-2 border text-gray-900 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Published Date
-              </label>
-              <input
-                v-model="form.published_at"
-                type="datetime-local"
-                class="w-full px-3 py-2 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Read Time (minutes)
-              </label>
-              <input
-                v-model.number="form.read_time"
-                type="number"
-                min="1"
-                class="w-full px-3 py-2 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">
-            Featured Image
-          </h3>
-
-          <div>
-            <input
-              @change="handleFileChange"
-              type="file"
-              accept="image/*"
-              class="w-full text-gray-900 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p class="mt-1 text-xs text-gray-500">Max 5MB</p>
-            <p v-if="featuredImageName" class="mt-1 text-xs text-gray-600">
-              Selected: {{ featuredImageName }}
-            </p>
-          </div>
-        </div>
-
-        <div class="flex justify-end space-x-3">
-          <router-link
-            to="/admin/posts"
-            class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Cancel
-          </router-link>
-          <button
-            type="submit"
-            :disabled="saving"
-            class="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {{ saving ? "Saving..." : "Save Post" }}
-          </button>
-        </div>
+        <aside class="grid gap-5 xl:sticky xl:top-24">
+          <Card><h2 class="mb-4 text-base font-semibold">Publishing</h2><div class="grid gap-4"><Field id="post-status" label="Status"><Select id="post-status" v-model="form.status"><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></Select></Field><Field id="post-published-at" label="Publish date"><Input id="post-published-at" v-model="form.published_at" type="datetime-local"/></Field><Field id="post-category" label="Category"><Select id="post-category" v-model="form.category_id"><option :value="undefined">Uncategorized</option><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></Select></Field><Field id="post-author" label="Author"><Input id="post-author" v-model="form.author" autocomplete="name"/></Field><Field id="post-read-time" label="Read time"><div class="flex gap-2"><Input id="post-read-time" v-model.number="form.read_time" type="number" min="1"/><Button variant="secondary" @click="estimateReadTime">Estimate</Button></div></Field></div></Card>
+          <Card><h2 class="mb-3 text-base font-semibold">Tags</h2><MultiSelectChips v-model="form.tags" :options="tags"/></Card>
+          <Card><h2 class="mb-3 text-base font-semibold">Featured image</h2><ImageUpload :existing="featuredImageUrl" @update:file="form.featured_image=$event" @remove-existing="removeFeaturedImage=$event"/><p v-if="form.featured_image" class="mt-2 truncate text-xs text-adm-ink-muted">Selected: {{ form.featured_image.name }}</p></Card>
+          <Card><p class="eyebrow text-adm-ink-muted">Search preview</p><div class="mt-2 grid gap-1"><p class="truncate text-sm font-semibold text-adm-info-ink">{{ seoTitle || 'Your article title' }}</p><p class="truncate text-xs text-adm-success-ink">{{ seoUrl }}</p><p class="line-clamp-2 text-xs text-adm-ink-muted">{{ seoDescription || 'Your excerpt will appear in search results.' }}</p></div></Card>
+        </aside>
+        <div class="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-adm-line bg-adm-surface/95 p-3 backdrop-blur xl:hidden"><Button class="flex-1" variant="secondary" @click="savePost(false)">Save draft</Button><Button class="flex-1" @click="savePost(true)">{{ form.status==='published'?'Update':'Publish' }}</Button></div>
       </form>
     </div>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import Quill from "quill";
-import "quill/dist/quill.snow.css";
-import Layout from "../components/Layout.vue";
-import api from "../utils/api";
-import type { Post, Category } from "../types";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import Quill from 'quill'
+import 'quill/dist/quill.snow.css'
+import api, { apiErrorMessage, fieldErrors } from '../utils/api'
+import type { Category } from '../types'
+import Layout from '../components/Layout.vue'
+import Badge from '../ui/Badge.vue'
+import Button from '../ui/Button.vue'
+import Card from '../ui/Card.vue'
+import ErrorBanner from '../ui/ErrorBanner.vue'
+import Field from '../ui/Field.vue'
+import ImageUpload from '../ui/ImageUpload.vue'
+import Input from '../ui/Input.vue'
+import MultiSelectChips from '../ui/MultiSelectChips.vue'
+import PageHeader from '../ui/PageHeader.vue'
+import Select from '../ui/Select.vue'
+import Textarea from '../ui/Textarea.vue'
+import { useUnsavedGuard } from '../ui/useUnsavedGuard'
+import { useToast } from '../ui/useToast'
 
-interface Tag {
-  id: number;
-  name: string;
-}
-
-const route = useRoute();
-const router = useRouter();
-const saving = ref(false);
-const isEditing = ref(false);
-const editorContainer = ref<HTMLElement | null>(null);
-const categories = ref<Category[]>([]);
-const tags = ref<Tag[]>([]);
-const metaKeys = ref<string[]>([]);
-const hasDraft = ref(false);
-const draftTimestamp = ref("");
-const featuredImageName = ref<string | null>(null);
-
-let quillEditor: Quill | null = null;
-
-const DRAFT_KEY = "post_form_draft";
-const DRAFT_TIMESTAMP_KEY = "post_form_draft_timestamp";
-const DRAFT_CONTENT_KEY = "post_form_draft_content";
-
-const form = ref<Post>({
-  category_id: undefined,
-  title: "",
-  slug: "",
-  excerpt: "",
-  content: "",
-  author: "",
-  read_time: undefined,
-  status: "draft",
-  published_at: "",
-  meta_data: {} as any,
-  tags: [],
-});
-
-// Load draft from localStorage
-const loadDraft = () => {
-  try {
-    const draft = localStorage.getItem(DRAFT_KEY);
-    const timestamp = localStorage.getItem(DRAFT_TIMESTAMP_KEY);
-    const content = localStorage.getItem(DRAFT_CONTENT_KEY);
-
-    if (draft && timestamp) {
-      const parsedDraft = JSON.parse(draft);
-      form.value = { ...form.value, ...parsedDraft };
-      
-      // Restore meta keys
-      if (parsedDraft.meta_data) {
-        metaKeys.value = Object.keys(parsedDraft.meta_data);
-      }
-      
-      // Restore featured image name
-      if (parsedDraft.featuredImageName) {
-        featuredImageName.value = parsedDraft.featuredImageName;
-      }
-      
-      hasDraft.value = true;
-      draftTimestamp.value = new Date(timestamp).toLocaleString();
-      
-      // Load editor content separately after Quill is initialized
-      if (content && quillEditor) {
-        quillEditor.root.innerHTML = content;
-      }
+interface TagOption {id:number;name:string}
+interface MetaRow {id:string;key:string;value:string}
+interface PostFormData {category_id?:number;title:string;slug:string;excerpt:string;content:string;author:string;read_time?:number;status:'draft'|'published'|'archived';published_at:string;meta_data:Record<string,string>;tags:number[];featured_image:File|null}
+const route=useRoute();const router=useRouter();const toast=useToast();const editorContainer=ref<HTMLElement|null>(null);const categories=ref<Category[]>([]);const tags=ref<TagOption[]>([]);const metaRows=ref<MetaRow[]>([]);const hasDraft=ref(false);const draftTimestamp=ref('');const featuredImageUrl=ref('');const removeFeaturedImage=ref(false);const errors=ref<Record<string,string>>({});const failure=ref('');const saving=ref(false);const isEditing=ref(false);const slugWasEdited=ref(false);let editor:Quill|null=null;let draftTimer:ReturnType<typeof setTimeout>|undefined;let draftKey='post_form_draft_create'
+const form=ref<PostFormData>({title:'',slug:'',excerpt:'',content:'',author:'Lorenzo Chukwuebuka Obi',status:'draft',published_at:'',meta_data:{},tags:[],featured_image:null})
+const {reset:resetGuard}=useUnsavedGuard(form)
+const seoTitle=computed(()=>form.value.title.trim());const seoDescription=computed(()=>form.value.excerpt.trim());const seoUrl=computed(()=>`${window.location.origin}/blog/${form.value.slug||'article-slug'}`)
+watch(()=>form.value.title,(title)=>{if(!slugWasEdited.value)form.value.slug=slugify(title)})
+watch([form,metaRows],()=>scheduleDraft(),{deep:true})
+function slugify(value:string){return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+function resetSlug(){slugWasEdited.value=false;form.value.slug=slugify(form.value.title)}
+function localDateTime(value?:string|null){if(!value)return '';const date=new Date(value);if(Number.isNaN(date.getTime()))return '';date.setMinutes(date.getMinutes()-date.getTimezoneOffset());return date.toISOString().slice(0,16)}
+function isoDateTime(value:string){return value?new Date(value).toISOString():''}
+function imageUrl(path?:string|null){if(!path)return '';return path.startsWith('http')||path.startsWith('/storage/')?path:`/storage/${path.replace(/^\//,'')}`}
+function syncMeta(){const next:Record<string,string>={};metaRows.value.forEach(row=>{const key=row.key.trim();if(key)next[key]=row.value});form.value.meta_data=next}
+function addMeta(){metaRows.value.push({id:crypto.randomUUID(),key:'',value:''})}
+function removeMeta(id:string){metaRows.value=metaRows.value.filter(row=>row.id!==id);syncMeta()}
+function estimateReadTime(){const text=(editor?.getText()||'').trim();form.value.read_time=Math.max(1,Math.ceil((text.match(/[\p{L}\p{N}]+/gu)||[]).length/200))}
+function saveDraftSnapshot(){const {featured_image,...safeForm}=form.value;localStorage.setItem(draftKey,JSON.stringify({form:safeForm,metaRows:metaRows.value,featuredImageUrl:featuredImageUrl.value,updatedAt:new Date().toISOString()}));if(editor)localStorage.setItem(`${draftKey}:content`,editor.root.innerHTML)}
+function scheduleDraft(){clearTimeout(draftTimer);draftTimer=window.setTimeout(()=>{try{saveDraftSnapshot()}catch{/* localStorage quota or privacy mode */}},800)}
+function restoreDraft(){try{const saved=JSON.parse(localStorage.getItem(draftKey)||'{}');if(!saved.form)return;form.value={...form.value,...saved.form,featured_image:null};metaRows.value=saved.metaRows||Object.entries(saved.form.meta_data||{}).map(([key,value])=>({id:crypto.randomUUID(),key,value:String(value)}));featuredImageUrl.value=saved.featuredImageUrl||featuredImageUrl.value;if(editor)editor.root.innerHTML=localStorage.getItem(`${draftKey}:content`)||saved.form.content||'';hasDraft.value=false;toast('Local draft restored.','info')}catch{toast('Saved draft could not be restored.','error')}}
+function clearDraft(){localStorage.removeItem(draftKey);localStorage.removeItem(`${draftKey}:content`);hasDraft.value=false}
+function setupImageHandler(instance:Quill){const toolbar=instance.getModule('toolbar') as {addHandler:(name:string,handler:()=>void)=>void};toolbar.addHandler('image',()=>{const input=document.createElement('input');input.type='file';input.accept='image/jpeg,image/png,image/webp,image/gif';input.onchange=async()=>{const file=input.files?.[0];if(!file)return;if(file.size>5*1024*1024){toast('Images must be 5 MB or smaller.','error');return}const selection=instance.getSelection(true);if(!selection)return;const data=new FormData();data.append('image',file);try{const response=await api.uploadFile('/admin/uploads',data);instance.insertEmbed(selection.index,'image',response.data.url,'user');instance.setSelection(selection.index+1);toast('Image uploaded.','success')}catch(error){toast(apiErrorMessage(error,'Image upload failed.'),'error')}};input.click()})}
+onMounted(async()=>{
+  try{
+    const slug=route.params.slug
+    isEditing.value=Boolean(slug)
+    if(slug)draftKey=`post_form_draft_${String(slug)}`
+    const [categoryResponse,tagResponse]=await Promise.all([api.get('/admin/categories',{params:{per_page:50}}),api.get('/admin/tags',{params:{per_page:50}})])
+    categories.value=categoryResponse.data.data;tags.value=tagResponse.data.data
+    if(slug){const {data}=await api.get(`/admin/posts/${slug}`);form.value={category_id:data.category_id||undefined,title:data.title||'',slug:data.slug||'',excerpt:data.excerpt||'',content:data.content||'',author:data.author||'',read_time:data.read_time||undefined,status:data.status||'draft',published_at:localDateTime(data.published_at),meta_data:data.meta_data||{},tags:(data.tags||[]).map((tag:TagOption)=>tag.id),featured_image:null};featuredImageUrl.value=imageUrl(data.media?.find((media:{type:string})=>media.type==='featured')?.url);slugWasEdited.value=true;metaRows.value=Object.entries(form.value.meta_data).map(([key,value])=>({id:crypto.randomUUID(),key,value:String(value)}))}
+    await nextTick()
+    if (editorContainer.value) {
+      editor = new Quill(editorContainer.value, {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            [{ header: [2, 3, 4, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            [{ align: [] }],
+            ['link', 'image'],
+            ['clean'],
+          ],
+        },
+        placeholder: 'Write the article...',
+      })
+      setupImageHandler(editor)
+      editor.root.innerHTML = form.value.content || ''
+      editor.on('text-change', () => {
+        form.value.content = editor?.root.innerHTML || ''
+        scheduleDraft()
+      })
     }
-  } catch (error) {
-    console.error("Failed to load draft:", error);
-  }
-};
-
-// Save draft to localStorage
-const saveDraft = () => {
-  if (isEditing.value) return; // Don't save drafts when editing
-
-  try {
-    const draftData = {
-      category_id: form.value.category_id,
-      title: form.value.title,
-      slug: form.value.slug,
-      excerpt: form.value.excerpt,
-      author: form.value.author,
-      read_time: form.value.read_time,
-      status: form.value.status,
-      published_at: form.value.published_at,
-      meta_data: form.value.meta_data,
-      tags: form.value.tags,
-      featuredImageName: featuredImageName.value,
-    };
-
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-    localStorage.setItem(DRAFT_TIMESTAMP_KEY, new Date().toISOString());
-    
-    // Save editor content separately
-    if (quillEditor) {
-      localStorage.setItem(DRAFT_CONTENT_KEY, quillEditor.root.innerHTML);
-    }
-  } catch (error) {
-    console.error("Failed to save draft:", error);
-  }
-};
-
-// Clear draft from localStorage
-const clearDraft = () => {
-  localStorage.removeItem(DRAFT_KEY);
-  localStorage.removeItem(DRAFT_TIMESTAMP_KEY);
-  localStorage.removeItem(DRAFT_CONTENT_KEY);
-  hasDraft.value = false;
-  
-  // Reset form to empty state
-  form.value = {
-    category_id: undefined,
-    title: "",
-    slug: "",
-    excerpt: "",
-    content: "",
-    author: "",
-    read_time: undefined,
-    status: "draft",
-    published_at: "",
-    meta_data: {},
-    tags: [],
-  };
-  
-  metaKeys.value = [];
-  featuredImageName.value = null;
-  
-  // Clear editor content
-  if (quillEditor) {
-    quillEditor.root.innerHTML = "";
-  }
-};
-
-onMounted(async () => {
-  await fetchCategories();
-  await fetchTags();
-
-  // Wait for DOM to be fully updated
-  await nextTick();
-
-  // Initialize Quill editor
-  if (editorContainer.value) {
-    quillEditor = new Quill(editorContainer.value, {
-      theme: "snow",
-      modules: {
-        toolbar: [
-          [{ header: [1, 2, 3, 4, 5, 6, false] }],
-          ["bold", "italic", "underline", "strike"],
-          ["blockquote", "code-block"],
-          [{ list: "ordered" }, { list: "bullet" }],
-          [{ script: "sub" }, { script: "super" }],
-          [{ indent: "-1" }, { indent: "+1" }],
-          [{ color: [] }, { background: [] }],
-          [{ align: [] }],
-          ["link", "image", "video"],
-          ["clean"],
-        ],
-      },
-      placeholder: "Write your post content here...",
-    });
-
-    // Listen for text changes in the editor
-    quillEditor.on("text-change", () => {
-      if (!isEditing.value) {
-        debouncedSaveDraft();
-      }
-    });
-  }
-
-  const postId = route.params.slug;
-
-  if (postId) {
-    // Editing mode - load post data
-    isEditing.value = true;
-    const { data } = await api.get(`/admin/posts/${postId}`);
-
-    const post = data;
-
-    if (post.meta_data && typeof post.meta_data === "string") {
-      post.meta_data = JSON.parse(post.meta_data);
-    }
-    form.value.meta_data = post.meta_data || {};
-    //@ts-ignore
-    metaKeys.value = Object.keys(form.value.meta_data);
-
-    form.value = {
-      ...form.value,
-      ...post,
-      tags: post.tags ? post.tags.map((t: any) => t.id) : [],
-      meta_data: post.meta_data || {},
-    };
-
-    if (quillEditor && data.content) {
-      quillEditor.root.innerHTML = data.content;
-    }
-  } else {
-    // Create mode - try to load draft
-    loadDraft();
-    
-    // If draft has content, load it into editor
-    const savedContent = localStorage.getItem(DRAFT_CONTENT_KEY);
-    if (savedContent && quillEditor) {
-      quillEditor.root.innerHTML = savedContent;
-    }
-  }
-});
-
-onBeforeUnmount(() => {
-  if (quillEditor) {
-    quillEditor.off("text-change");
-  }
-  quillEditor = null;
-  clearTimeout(draftTimeout);
-});
-
-const fetchCategories = async () => {
-  const { data } = await api.get("/admin/categories");
-  categories.value = data.data;
-};
-
-const fetchTags = async () => {
-  const { data } = await api.get("/admin/tags");
-  tags.value = data.data;
-};
-
-const addMetaField = () => {
-  const newKey = `key_${Date.now()}`;
-  //@ts-ignore
-  form.value.meta_data[newKey] = "";
-  metaKeys.value.push(newKey);
-};
-
-const removeMetaField = (key: string) => {
-  //@ts-ignore
-  delete form.value.meta_data[key];
-  const index = metaKeys.value.indexOf(key);
-  if (index > -1) {
-    metaKeys.value.splice(index, 1);
-  }
-};
-
-const updateMetaKey = (index: number, oldKey: string) => {
-  const newKey = metaKeys.value[index];
-  if (newKey !== oldKey && newKey) {
-    //@ts-ignore
-    const value = form.value.meta_data[oldKey];
-    //@ts-ignore
-    delete form.value.meta_data[oldKey];
-    //@ts-ignore
-    form.value.meta_data[newKey] = value;
-  }
-};
-
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  if (target.files && target.files[0]) {
-    form.value.featured_image = target.files[0];
-    featuredImageName.value = target.files[0].name;
-  }
-};
-
-// Watch form changes and auto-save draft (debounced)
-let draftTimeout: ReturnType<typeof setTimeout>;
-const debouncedSaveDraft = () => {
-  clearTimeout(draftTimeout);
-  draftTimeout = setTimeout(() => {
-    saveDraft();
-  }, 1000); // Debounce 1 second
-};
-
-watch(
-  form,
-  () => {
-    if (!isEditing.value) {
-      debouncedSaveDraft();
-    }
-  },
-  { deep: true }
-);
-
-watch(metaKeys, () => {
-  if (!isEditing.value) {
-    debouncedSaveDraft();
-  }
-}, { deep: true });
-
-watch(featuredImageName, () => {
-  if (!isEditing.value) {
-    debouncedSaveDraft();
-  }
-});
-
-const savePost = async () => {
-  if (!quillEditor) return;
-
-  saving.value = true;
-  try {
-    form.value.content = quillEditor.root.innerHTML;
-
-    const formData = new FormData();
-
-    Object.entries(form.value).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        if (key === "meta_data") {
-          formData.append(key, JSON.stringify(value));
-        } else if (key === "tags") {
-          // Tags sent as JSON array
-          formData.append(key, JSON.stringify(value));
-        } else if (value instanceof File) {
-          formData.append(key, value);
-        } else {
-          formData.append(key, value.toString());
-        }
-      }
-    });
-
-    if (isEditing.value) {
-      formData.append("_method", "put");
-      await api.post(`/admin/posts/${route.params.slug}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-    } else {
-      await api.post("/admin/posts", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      
-      // Clear draft after successful save
-      clearDraft();
-    }
-
-    router.push("/admin/posts");
-  } catch (error) {
-    //@ts-ignore
-    alert(error.response?.data?.message || "An error occurred");
-  } finally {
-    saving.value = false;
-  }
-};
+    const previous=localStorage.getItem(draftKey);if(previous){try{const saved=JSON.parse(previous);hasDraft.value=true;draftTimestamp.value=new Date(saved.updatedAt).toLocaleString()}catch{clearDraft()}}
+    resetGuard()
+    window.addEventListener('keydown',saveShortcut)
+  }catch(error){failure.value=apiErrorMessage(error,'Post editor could not be loaded.')}
+})
+onBeforeUnmount(()=>{clearTimeout(draftTimer);window.removeEventListener('keydown',saveShortcut);if(editor){editor.off('text-change');editor=null}})
+function saveShortcut(event:KeyboardEvent){if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='s'){event.preventDefault();void savePost()}}
+async function savePost(publish?:boolean){if(!editor)return;failure.value='';errors.value={};saving.value=true;form.value.content=editor.root.innerHTML;if(publish!==undefined)form.value.status=publish?'published':'draft';syncMeta();const data=new FormData();const fields:Record<string,string>={category_id:form.value.category_id?String(form.value.category_id):'',title:form.value.title,slug:form.value.slug,excerpt:form.value.excerpt,content:form.value.content,author:form.value.author,read_time:form.value.read_time?String(form.value.read_time):'',status:form.value.status,published_at:isoDateTime(form.value.published_at),meta_data:JSON.stringify(form.value.meta_data),tags:JSON.stringify(form.value.tags)};Object.entries(fields).forEach(([key,value])=>data.append(key,value));if(form.value.featured_image)data.append('featured_image',form.value.featured_image);if(removeFeaturedImage.value)data.append('remove_featured_image','1');try{if(isEditing.value){data.append('_method','put');await api.post(`/admin/posts/${route.params.slug}`,data,{headers:{'Content-Type':'multipart/form-data'}})}else await api.post('/admin/posts',data,{headers:{'Content-Type':'multipart/form-data'}});clearDraft();resetGuard();toast(form.value.status==='published'?'Post published.':'Draft saved.','success');await router.push('/admin/posts')}catch(error){errors.value=fieldErrors(error);failure.value=apiErrorMessage(error,'Post could not be saved.');toast(failure.value,'error')}finally{saving.value=false}}
 </script>
 
 <style>
-.ql-container {
-  min-height: 300px;
-  font-size: 16px;
-}
-
-.ql-editor {
-  min-height: 300px;
-}
+.admin-quill-editor .ql-toolbar.ql-snow,.admin-quill-editor .ql-container.ql-snow{border-color:var(--adm-line);color:var(--adm-ink)}
+.admin-quill-editor .ql-toolbar.ql-snow{border-radius:var(--radius-md) var(--radius-md) 0 0;background:var(--adm-surface-2)}
+.admin-quill-editor .ql-container.ql-snow{border-radius:0 0 var(--radius-md) var(--radius-md);background:var(--adm-surface);font:400 1rem/1.7 var(--font-body)}
+.admin-quill-editor .ql-editor{min-height:22rem;color:var(--adm-ink)}
+.admin-quill-editor .ql-editor.ql-blank::before{color:var(--adm-ink-muted)}
+.admin-quill-editor .ql-stroke{stroke:var(--adm-ink-muted)}
+.admin-quill-editor .ql-fill{fill:var(--adm-ink-muted)}
+.admin-quill-editor .ql-picker{color:var(--adm-ink-muted)}
 </style>

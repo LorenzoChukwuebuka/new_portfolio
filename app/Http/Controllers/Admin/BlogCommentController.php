@@ -11,6 +11,10 @@ class BlogCommentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+        ]);
+
         $comments = BlogComment::with('post:id,title,slug')
             ->when(
                 $request->filled('status') && $request->status !== 'all',
@@ -26,7 +30,7 @@ class BlogCommentController extends Controller
                 });
             })
             ->latest()
-            ->paginate(20);
+            ->paginate((int) ($validated['per_page'] ?? 20));
 
         return response()->json($comments);
     }

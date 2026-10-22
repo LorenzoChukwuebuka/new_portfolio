@@ -1,10 +1,13 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Media;
 use App\Models\Post;
+use App\Support\IndexNow\PublicContentIndexNowNotifier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -16,6 +19,8 @@ class PostController extends Controller
      */
     public function index(Request $request)
     {
+        $validated = $request->validate(['per_page' => ['sometimes', 'integer', 'min:1', 'max:50']]);
+        $perPage = (int) ($validated['per_page'] ?? 15);
         $query = Post::with(['category', 'tags', 'media'])
             ->withCount('tags');
 
@@ -32,14 +37,14 @@ class PostController extends Controller
         // Search
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
-                $q->where('title', 'like', '%' . $request->search . '%')
-                    ->orWhere('excerpt', 'like', '%' . $request->search . '%')
-                    ->orWhere('content', 'like', '%' . $request->search . '%');
+                $q->where('title', 'like', '%'.$request->search.'%')
+                    ->orWhere('excerpt', 'like', '%'.$request->search.'%')
+                    ->orWhere('content', 'like', '%'.$request->search.'%');
             });
         }
 
         $posts = $query->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->paginate($perPage);
 
         return response()->json($posts);
     }
@@ -59,18 +64,18 @@ class PostController extends Controller
         }
 
         $validated = $request->validate([
-            'category_id'    => 'nullable|exists:categories,id',
-            'title'          => 'required|string|max:255',
-            'slug'           => 'nullable|string|max:255|unique:posts,slug',
-            'excerpt'        => 'required|string',
-            'content'        => 'required|string',
-            'author'         => 'nullable|string|max:255',
-            'read_time'      => 'nullable|integer|min:1',
-            'status'         => 'required|in:draft,published,archived',
-            'published_at'   => 'nullable|date',
-            'meta_data'      => 'nullable|array',
-            'tags'           => 'nullable|array',
-            'tags.*'         => 'exists:tags,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'title' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:posts,slug',
+            'excerpt' => 'required|string',
+            'content' => 'required|string',
+            'author' => 'nullable|string|max:255',
+            'read_time' => 'nullable|integer|min:1',
+            'status' => 'required|in:draft,published,archived',
+            'published_at' => 'nullable|date',
+            'meta_data' => 'nullable|array',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
             'featured_image' => 'nullable|image|max:5120', // 5MB
         ]);
 
@@ -85,7 +90,7 @@ class PostController extends Controller
         }
 
         // Create post
-        $post = Post::create($validated);
+        $post = DB::transaction(fn () => Post::create($validated));
 
         // Attach tags
         if (isset($validated['tags'])) {
@@ -99,7 +104,7 @@ class PostController extends Controller
 
         return response()->json([
             'message' => 'Post created successfully',
-            'post'    => $post->load(['category', 'tags', 'media']),
+            'post' => $post->load(['category', 'tags', 'media']),
         ], 201);
     }
 
@@ -109,6 +114,24 @@ class PostController extends Controller
     public function show(Post $post)
     {
         return response()->json($post->load(['category', 'tags', 'media']));
+    }
+
+    public function setStatus(Request $request, Post $post)
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['draft', 'published', 'archived'])],
+        ]);
+
+        $post->status = $validated['status'];
+        if ($post->status === 'published' && ! $post->published_at) {
+            $post->published_at = now();
+        }
+        $post->save();
+
+        return response()->json([
+            'message' => 'Post status updated.',
+            'post' => $post->fresh()->load(['category', 'tags', 'media']),
+        ]);
     }
 
     /**
@@ -127,24 +150,25 @@ class PostController extends Controller
         }
 
         $validated = $request->validate([
-            'category_id'    => 'nullable|exists:categories,id',
-            'title'          => 'required|string|max:255',
-            'slug'           => [
+            'category_id' => 'nullable|exists:categories,id',
+            'title' => 'required|string|max:255',
+            'slug' => [
                 'nullable',
                 'string',
                 'max:255',
                 Rule::unique('posts')->ignore($post->id),
             ],
-            'excerpt'        => 'required|string',
-            'content'        => 'required|string',
-            'author'         => 'nullable|string|max:255',
-            'read_time'      => 'nullable|integer|min:1',
-            'status'         => 'required|in:draft,published,archived',
-            'published_at'   => 'nullable|date',
-            'meta_data'      => 'nullable|array',
-            'tags'           => 'nullable|array',
-            'tags.*'         => 'exists:tags,id',
+            'excerpt' => 'required|string',
+            'content' => 'required|string',
+            'author' => 'nullable|string|max:255',
+            'read_time' => 'nullable|integer|min:1',
+            'status' => 'required|in:draft,published,archived',
+            'published_at' => 'nullable|date',
+            'meta_data' => 'nullable|array',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
             'featured_image' => 'nullable|image|max:5120',
+            'remove_featured_image' => 'nullable|boolean',
         ]);
 
         // Auto-generate slug if not provided
@@ -158,11 +182,25 @@ class PostController extends Controller
         }
 
         // Update post
-        $post->update($validated);
+        DB::transaction(function () use ($post, $validated): void {
+            $post->update($validated);
+        });
+
+        $publicRelationsChanged = false;
 
         // Sync tags
         if (isset($validated['tags'])) {
-            $post->tags()->sync($validated['tags']);
+            $changes = $post->tags()->sync($validated['tags']);
+            $publicRelationsChanged = $changes['attached'] !== [] || $changes['detached'] !== [] || $changes['updated'] !== [];
+        }
+
+        if ($request->boolean('remove_featured_image') && ! $request->hasFile('featured_image')) {
+            $oldFeaturedImage = $post->featuredImage();
+            if ($oldFeaturedImage) {
+                Storage::disk('public')->delete($oldFeaturedImage->url);
+                $oldFeaturedImage->delete();
+                $publicRelationsChanged = true;
+            }
         }
 
         // Handle featured image upload
@@ -170,16 +208,21 @@ class PostController extends Controller
             // Delete old featured image
             $oldFeaturedImage = $post->featuredImage();
             if ($oldFeaturedImage) {
-                Storage::delete($oldFeaturedImage->url);
+                Storage::disk('public')->delete($oldFeaturedImage->url);
                 $oldFeaturedImage->delete();
             }
 
             $this->uploadFeaturedImage($request->file('featured_image'), $post);
+            $publicRelationsChanged = true;
+        }
+
+        if ($publicRelationsChanged && $post->status === 'published' && $post->published_at?->lte(now())) {
+            app(PublicContentIndexNowNotifier::class)->postBecamePublic($post, source: 'post-relations-updated');
         }
 
         return response()->json([
             'message' => 'Post updated successfully',
-            'post'    => $post->fresh()->load(['category', 'tags', 'media']),
+            'post' => $post->fresh()->load(['category', 'tags', 'media']),
         ]);
     }
 
@@ -193,7 +236,9 @@ class PostController extends Controller
             Storage::delete($media->url);
         }
 
-        $post->delete();
+        DB::transaction(function () use ($post): void {
+            $post->delete();
+        });
 
         return response()->json([
             'message' => 'Post deleted successfully',
@@ -206,11 +251,13 @@ class PostController extends Controller
     public function restore($id)
     {
         $post = Post::withTrashed()->findOrFail($id);
-        $post->restore();
+        DB::transaction(function () use ($post): void {
+            $post->restore();
+        });
 
         return response()->json([
             'message' => 'Post restored successfully',
-            'post'    => $post->load(['category', 'tags', 'media']),
+            'post' => $post->load(['category', 'tags', 'media']),
         ]);
     }
 
@@ -222,8 +269,8 @@ class PostController extends Controller
         $path = $file->store('posts/featured', 'public');
 
         $post->media()->create([
-            'url'       => $path,
-            'type'      => 'featured',
+            'url' => $path,
+            'type' => 'featured',
             'thumbnail' => $path, // You can generate thumbnail here
         ]);
     }
@@ -234,7 +281,7 @@ class PostController extends Controller
     public function uploadGalleryImages(Request $request, Post $post)
     {
         $request->validate([
-            'images'   => 'required|array',
+            'images' => 'required|array',
             'images.*' => 'image|max:5120',
         ]);
 
@@ -244,17 +291,21 @@ class PostController extends Controller
             $path = $image->store('posts/gallery', 'public');
 
             $media = $post->media()->create([
-                'url'       => $path,
-                'type'      => 'gallery',
+                'url' => $path,
+                'type' => 'gallery',
                 'thumbnail' => $path,
             ]);
 
             $uploadedImages[] = $media;
         }
 
+        if ($post->status === 'published' && $post->published_at?->lte(now())) {
+            app(PublicContentIndexNowNotifier::class)->postBecamePublic($post, source: 'post-gallery-updated');
+        }
+
         return response()->json([
             'message' => 'Images uploaded successfully',
-            'images'  => $uploadedImages,
+            'images' => $uploadedImages,
         ]);
     }
 
@@ -271,6 +322,10 @@ class PostController extends Controller
 
         Storage::delete($media->url);
         $media->delete();
+
+        if ($post->status === 'published' && $post->published_at?->lte(now())) {
+            app(PublicContentIndexNowNotifier::class)->postBecamePublic($post, source: 'post-media-deleted');
+        }
 
         return response()->json([
             'message' => 'Media deleted successfully',
