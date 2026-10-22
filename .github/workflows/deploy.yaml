@@ -1,54 +1,349 @@
-name: Deploy Laravel + Vue (cPanel)
+name: Deploy Laravel + Vue (Litehost)
+
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      indexnow_action:
+        description: Verify the configured key file or run the guarded one-time URL submission
+        required: false
+        type: choice
+        options:
+          - none
+          - verify-key
+          - submit-existing
+        default: none
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litehost-production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Build Vue assets inside Laravel
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.12.0
 
       - name: Install Node Dependencies
-        run: npm install --force
+        run: npm ci
 
       - name: Build Assets
         run: npm run build
 
-      # Install PHP dependencies (so server doesn't need composer)
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
 
       - name: Install Composer Dependencies
-        run: composer install --no-dev --optimize-autoloader
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
-      # Setup SSH on the runner
-      - name: Setup SSH
+      - name: Verify SSH Endpoint, Host Key, and Key Pair
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_SSH_SECRET: ${{ secrets.CPANEL_SSH_SECRET }}
+          CPANEL_PUBLIC_KEY: ${{ secrets.CPANEL_PUBLIC_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.CPANEL_SSH_PORT || '22' }}
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.CPANEL_SSH_SECRET }}" > ~/.ssh/id_ecdsa
-          echo "${{ secrets.CPANEL_SSH_PUBLIC_KEY }}" > ~/.ssh/id_ecdsa.pub
-          chmod 600 ~/.ssh/id_ecdsa
-          chmod 600 ~/.ssh/id_ecdsa.pub
-          ssh-keyscan -H -p 22 ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+          set -euo pipefail
 
-      # Push to a timestamped release folder
-      - name: Deploy Files to Server
+          for secret_name in SERVER_IP CPANEL_USER CPANEL_SSH_SECRET CPANEL_PUBLIC_KEY CPANEL_KNOWN_HOSTS; do
+            if [[ -z "${!secret_name:-}" ]]; then
+              echo "::error::Required GitHub Actions secret ${secret_name} is empty or missing."
+              exit 1
+            fi
+          done
+
+          if [[ ! "$SERVER_IP" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]]; then
+            echo "::error::SERVER_IP must be a hostname or IPv4 address; its value was not logged."
+            exit 1
+          fi
+
+          if [[ ! "$CPANEL_USER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::CPANEL_USER has an unsupported format; its value was not logged."
+            exit 1
+          fi
+
+          if [[ ! "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] || (( SSH_PORT < 1 || SSH_PORT > 65535 )); then
+            echo "::error::Set the repository variable CPANEL_SSH_PORT to the SSH port shown in Litehost's site settings."
+            exit 1
+          fi
+
+          install -d -m 700 "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$CPANEL_SSH_SECRET" > "$HOME/.ssh/id_deploy"
+          printf '%s\n' "$CPANEL_PUBLIC_KEY" > "$HOME/.ssh/provided.pub"
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_deploy" "$HOME/.ssh/provided.pub" "$HOME/.ssh/known_hosts"
+
+          if ! ssh-keygen -y -P '' -f "$HOME/.ssh/id_deploy" > "$HOME/.ssh/id_deploy.pub" 2>/dev/null; then
+            echo "::error::CPANEL_SSH_SECRET is not a readable, unencrypted SSH private key. No key data was logged."
+            exit 1
+          fi
+
+          private_fingerprint="$(ssh-keygen -lf "$HOME/.ssh/id_deploy.pub" 2>/dev/null | awk 'NR == 1 {print $2}')"
+          public_fingerprint="$(ssh-keygen -lf "$HOME/.ssh/provided.pub" 2>/dev/null | awk 'NR == 1 {print $2}')"
+          if [[ -z "$private_fingerprint" || -z "$public_fingerprint" || "$private_fingerprint" != "$public_fingerprint" ]]; then
+            echo "::error::CPANEL_PUBLIC_KEY does not match CPANEL_SSH_SECRET. Fingerprints and key data were not logged."
+            exit 1
+          fi
+
+          host_key_lookup="$SERVER_IP"
+          if [[ "$SSH_PORT" != "22" ]]; then
+            host_key_lookup="[$SERVER_IP]:$SSH_PORT"
+          fi
+          if ! ssh-keygen -F "$host_key_lookup" -f "$HOME/.ssh/known_hosts" >/dev/null 2>&1; then
+            echo "::error::CPANEL_KNOWN_HOSTS has no trusted host-key entry for SERVER_IP on port $SSH_PORT. Verify the fingerprint with Litehost before updating it."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import os
+          import socket
+          import sys
+
+          host = os.environ["SERVER_IP"]
+          port = int(os.environ["SSH_PORT"])
+          try:
+              addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+          except socket.gaierror:
+              print("::error::DNS resolution failed for SERVER_IP. Check the server IPv4 address in Litehost's site settings.")
+              sys.exit(1)
+
+          last_error = None
+          for family, socktype, proto, _, address in addresses:
+              try:
+                  with socket.socket(family, socktype, proto) as connection:
+                      connection.settimeout(8)
+                      connection.connect(address)
+                  print(f"TCP connection to the configured SSH endpoint on port {port} succeeded.")
+                  sys.exit(0)
+              except OSError as error:
+                  last_error = error
+
+          if isinstance(last_error, ConnectionRefusedError):
+              reason = "ConnectionRefusedError"
+          elif isinstance(last_error, TimeoutError):
+              reason = "TimeoutError"
+          else:
+              reason = type(last_error).__name__ if last_error else "UnknownNetworkError"
+          print(f"::error::Could not connect to the configured SSH endpoint on port {port} ({reason}). Check the Litehost server address, SSH service, and any firewall or runner IP allowlist.")
+          sys.exit(1)
+          PY
+
+          ssh_options=(
+            -i "$HOME/.ssh/id_deploy"
+            -p "$SSH_PORT"
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o IdentitiesOnly=yes
+            -o PreferredAuthentications=publickey
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+
+          ssh_output="$(mktemp)"
+          ssh_error="$(mktemp)"
+          if ! ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" true >"$ssh_output" 2>"$ssh_error"; then
+            if grep -Eqi 'REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed|No .* host key is known' "$ssh_error"; then
+              echo "::error::SSH host-key verification failed for the configured endpoint."
+            elif grep -Eqi 'Permission denied|No more authentication methods' "$ssh_error"; then
+              echo "::error::The key pair was parsed locally, but Litehost rejected public-key authentication. Check CPANEL_USER and authorize the matching key for that hosting account."
+            elif grep -Eqi 'Could not resolve hostname|Connection timed out|Connection refused|No route to host|Operation timed out' "$ssh_error"; then
+              echo "::error::SSH failed after the TCP preflight. Recheck the Litehost endpoint and network allowlisting."
+            else
+              echo "::error::SSH preflight failed for an unclassified reason. Raw SSH diagnostics were suppressed."
+            fi
+            rm -f "$ssh_output" "$ssh_error"
+            exit 1
+          fi
+          rm -f "$ssh_output" "$ssh_error"
+          echo "SSH host-key verification and public-key authentication succeeded."
+          echo "Read-only Litehost release and route diagnostics:"
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$GITHUB_EVENT_NAME" <<'READONLY_DIAGNOSTICS'
+          set -euo pipefail
+          EVENT_NAME="$1"
+          CURRENT="$HOME/production/current"
+          if [[ -L "$CURRENT" ]]; then
+            printf 'Active release path: %s\n' "$(readlink -f -- "$CURRENT")"
+          else
+            echo "Active release path: missing symlink"
+          fi
+          echo "Public rewrite rules:"
+          if [[ -f "$HOME/public_html/.htaccess" ]]; then
+            grep -E '^[[:space:]]*Rewrite(Cond|Rule)' "$HOME/public_html/.htaccess" || true
+          else
+            echo "public_html/.htaccess is missing"
+          fi
+          if [[ -d "$CURRENT" ]]; then
+            cd "$CURRENT"
+            php artisan route:list --path=sitemap.xml -v
+            php artisan route:list --path=robots.txt -v
+          fi
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            ENV_FILE="$HOME/production/shared/.env"
+            BACKUP_FILE="$HOME/.env-before-seo-canonical-20261020"
+            EXPECTED_CANONICAL="SEO_CANONICAL_URL=https://lorenzochukwuebuka.com.ng"
+            if [[ ! -f "$ENV_FILE" ]]; then
+              echo "Production shared .env is missing; refusing deployment."
+              exit 1
+            fi
+            if ! grep -Fqx "$EXPECTED_CANONICAL" "$ENV_FILE"; then
+              if [[ ! -f "$BACKUP_FILE" ]]; then
+                cp -p -- "$ENV_FILE" "$BACKUP_FILE"
+                chmod 600 "$BACKUP_FILE"
+              fi
+              ENV_TEMP="$(mktemp "$HOME/production/shared/.env-canonical-XXXXXX")"
+              if ! awk -v expected="$EXPECTED_CANONICAL" '
+                BEGIN { found = 0 }
+                /^[[:space:]]*SEO_CANONICAL_URL[[:space:]]*=/ {
+                  if (!found) print expected
+                  found = 1
+                  next
+                }
+                { print }
+                END { if (!found) print expected }
+              ' "$ENV_FILE" > "$ENV_TEMP"; then
+                rm -f -- "$ENV_TEMP"
+                echo "Could not update the production canonical URL safely."
+                exit 1
+              fi
+              ENV_MODE="$(stat -c '%a' -- "$ENV_FILE")"
+              chmod "$ENV_MODE" "$ENV_TEMP"
+              mv -f -- "$ENV_TEMP" "$ENV_FILE"
+            fi
+            if ! grep -Fqx "$EXPECTED_CANONICAL" "$ENV_FILE"; then
+              echo "The production canonical URL did not validate after the update."
+              exit 1
+            fi
+            cd "$CURRENT"
+            php artisan config:cache
+            echo "Production canonical URL validated and active config cache refreshed; other .env values were not read or logged."
+          fi
+          READONLY_DIAGNOSTICS
+
+      - name: Run IndexNow production command
+        if: github.event_name == 'workflow_dispatch' && inputs.indexnow_action != 'none'
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ vars.CPANEL_SSH_PORT || '22' }}
+          INDEXNOW_ACTION: ${{ inputs.indexnow_action }}
         run: |
-          RELEASE=$(date +%Y-%m-%d_%H-%M-%S)
-          echo "RELEASE=$RELEASE" >> $GITHUB_ENV
-          rsync -avz \
-            -e "ssh -i ~/.ssh/id_ecdsa -p 428 -o StrictHostKeyChecking=no" \
+          set -euo pipefail
+
+          case "$INDEXNOW_ACTION" in
+            verify-key)
+              remote_command='cd "$HOME/production/current" && php artisan indexnow:submit-existing --verify-key'
+              ;;
+            submit-existing)
+              remote_command='cd "$HOME/production/current" && php artisan indexnow:submit-existing --execute --batch=100 --max-batches=100'
+              ;;
+            *)
+              echo "::error::Unsupported IndexNow action."
+              exit 1
+              ;;
+          esac
+
+          ssh_options=(
+            -i "$HOME/.ssh/id_deploy"
+            -p "$SSH_PORT"
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" "$remote_command"
+
+      - name: Verify Current Production SEO Endpoints
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "https://lorenzochukwuebuka.com.ng"
+          checks = {
+              "/": ("text/html", ""),
+              "/sitemap.xml": ("application/xml", "<?xml"),
+              "/robots.txt": ("text/plain", "User-agent: *"),
+          }
+
+          for path, (expected_type, expected_prefix) in checks.items():
+              try:
+                  request = Request(base + path, headers={"User-Agent": "Litehost production smoke check", "Cache-Control": "no-cache"})
+                  with urlopen(request, timeout=20) as response:
+                      content_type = response.headers.get_content_type()
+                      body = response.read(100000).decode("utf-8", "replace")
+                      if response.status != 200 or content_type != expected_type:
+                          print(f"::error::Production {path} returned HTTP {response.status} with {content_type}; expected {expected_type}.")
+                          raise SystemExit(1)
+                      if expected_prefix and not body.lstrip().startswith(expected_prefix):
+                          print(f"::error::Production {path} returned unexpected content; response body was not logged.")
+                          raise SystemExit(1)
+                      print(f"Production {path}: HTTP {response.status}, {content_type}.")
+              except HTTPError as error:
+                  print(f"::error::Production {path} returned HTTP {error.code}; response body was not logged.")
+                  raise SystemExit(1)
+              except URLError as error:
+                  print(f"::error::Could not reach production {path} ({type(error.reason).__name__}).")
+                  raise SystemExit(1)
+          PY
+
+      - name: Upload Candidate Release
+        if: github.event_name == 'push'
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ vars.CPANEL_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+
+          RELEASE="$(date -u +%Y%m%d%H%M%S)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf 'RELEASE=%s\n' "$RELEASE" >> "$GITHUB_ENV"
+
+          ssh_options=(
+            -i "$HOME/.ssh/id_deploy"
+            -p "$SSH_PORT"
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+          REMOTE_HOME="$(ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" 'printf "%s" "$HOME"')"
+          if [[ ! "$REMOTE_HOME" =~ ^/var/www/[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Litehost returned an unexpected site-home path; deployment stopped before upload."
+            exit 1
+          fi
+          BASE="$REMOTE_HOME/production"
+          RELEASE_DIR="$BASE/releases/$RELEASE"
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" "mkdir -p -- '$RELEASE_DIR'"
+
+          ssh_command="ssh -i $HOME/.ssh/id_deploy -p $SSH_PORT -o BatchMode=yes -o ConnectTimeout=10 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o GlobalKnownHostsFile=/dev/null"
+          rsync -az --delete \
+            -e "$ssh_command" \
             --exclude='.git' \
             --exclude='.env' \
             --exclude='node_modules' \
@@ -56,34 +351,151 @@ jobs:
             --exclude='.github' \
             --exclude='storage' \
             ./ \
-            ${{ secrets.CPANEL_USER }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.CPANEL_USER }}/production/releases/$RELEASE/
+            "$CPANEL_USER@$SERVER_IP:$RELEASE_DIR/"
 
-      # Activate release and run Laravel commands
-      - name: Activate Release & Run Laravel Commands
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.CPANEL_USER }}
-          key: ${{ secrets.CPANEL_SSH_SECRET }}
-          port: 428
-          script: |
-            BASE=/home/${{ secrets.CPANEL_USER }}/production
-            RELEASE=${{ env.RELEASE }}
+      - name: Prepare and Activate Release
+        if: github.event_name == 'push'
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ vars.CPANEL_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
 
-            # Link shared .env and storage into the new release
-            ln -sf $BASE/shared/.env $BASE/releases/$RELEASE/.env
-            ln -sf $BASE/shared/storage $BASE/releases/$RELEASE/storage
+          ssh_options=(
+            -i "$HOME/.ssh/id_deploy"
+            -p "$SSH_PORT"
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+          )
 
-            # Point current symlink to new release
-            ln -sfn $BASE/releases/$RELEASE $BASE/current
+          REMOTE_HOME="$(ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" 'printf "%s" "$HOME"')"
+          if [[ ! "$REMOTE_HOME" =~ ^/var/www/[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Litehost returned an unexpected site-home path; deployment stopped before activation."
+            exit 1
+          fi
+          BASE="$REMOTE_HOME/production"
 
-            # Run Laravel commands
-            cd $BASE/current
-            php artisan migrate --force
-            php artisan config:cache
-            php artisan storage:link
-            php artisan route:cache
-            php artisan view:cache
+          ssh "${ssh_options[@]}" "$CPANEL_USER@$SERVER_IP" bash -s -- "$BASE" "$RELEASE" "$REMOTE_HOME" <<'REMOTE_SCRIPT'
+          set -Eeuo pipefail
 
-            # Keep only last 5 releases, delete older ones
-            ls -dt $BASE/releases/*/ | tail -n +6 | xargs rm -rf
+          BASE="$1"
+          RELEASE="$2"
+          REMOTE_HOME="$3"
+          RELEASE_DIR="$BASE/releases/$RELEASE"
+          PHASE="candidate validation"
+          trap 'status=$?; printf "Deployment failed during %s for candidate %s (exit %s). The active release was not switched unless activation had completed.\n" "$PHASE" "$RELEASE" "$status" >&2; exit "$status"' ERR
+
+          if [[ ! "$REMOTE_HOME" =~ ^/var/www/[A-Za-z0-9._-]+$ || "$BASE" != "$REMOTE_HOME/production" || ! "$RELEASE" =~ ^[0-9]{14}-[0-9]+-[0-9]+$ ]]; then
+            echo "Invalid deployment path arguments." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "$BASE/shared/.env" || ! -d "$BASE/shared/storage" ]]; then
+            echo "Litehost setup is incomplete: expected shared/.env and shared/storage under the production directory." >&2
+            exit 1
+          fi
+
+          CURRENT="$BASE/current"
+          PUBLIC_LINK="$REMOTE_HOME/public_html/public"
+          if [[ ! -L "$CURRENT" || ! -e "$CURRENT" ]]; then
+            echo "Production/current must be an existing, working release symlink; refusing deployment." >&2
+            exit 1
+          fi
+          if [[ ! -L "$PUBLIC_LINK" ]]; then
+            echo "Litehost public_html/public is not a symlink; refusing to change the domain's existing web root." >&2
+            exit 1
+          fi
+
+          CURRENT_TARGET="$(readlink -f -- "$CURRENT" || true)"
+          if [[ -z "$CURRENT_TARGET" || "$CURRENT_TARGET" != "$BASE"/releases/* ]]; then
+            echo "Production/current must resolve to a release under production/releases; refusing deployment." >&2
+            exit 1
+          fi
+
+          PUBLIC_LINK_LITERAL="$(readlink -- "$PUBLIC_LINK" || true)"
+          if [[ "$PUBLIC_LINK_LITERAL" != *production/current/public ]]; then
+            echo "Litehost public_html/public must keep following production/current/public; refusing to change the existing web-root symlink." >&2
+            exit 1
+          fi
+
+          PUBLIC_TARGET="$(readlink -f -- "$PUBLIC_LINK" || true)"
+          CURRENT_PUBLIC_TARGET="$(readlink -f -- "$CURRENT/public" || true)"
+          if [[ -z "$PUBLIC_TARGET" || -z "$CURRENT_PUBLIC_TARGET" || "$PUBLIC_TARGET" != "$CURRENT_PUBLIC_TARGET" ]]; then
+            echo "Litehost public_html/public does not resolve to production/current/public; refusing deployment before migrations or activation." >&2
+            exit 1
+          fi
+          if [[ ! -f "$REMOTE_HOME/public_html/.htaccess" ]] || ! grep -Fq '/public/$1' "$REMOTE_HOME/public_html/.htaccess"; then
+            echo "Litehost public_html/.htaccess does not contain the expected rewrite through /public; refusing deployment." >&2
+            exit 1
+          fi
+
+          if [[ ! -d "$RELEASE_DIR" || ! -f "$RELEASE_DIR/artisan" || ! -f "$RELEASE_DIR/vendor/autoload.php" || ! -f "$RELEASE_DIR/public/build/manifest.json" ]]; then
+            echo "Uploaded release is incomplete; artisan, vendor/autoload.php, or public/build/manifest.json is missing." >&2
+            exit 1
+          fi
+
+          if [[ -e "$RELEASE_DIR/.env" || -L "$RELEASE_DIR/.env" || -e "$RELEASE_DIR/storage" || -L "$RELEASE_DIR/storage" ]]; then
+            echo "Candidate release already contains .env or storage; refusing to replace candidate data." >&2
+            exit 1
+          fi
+
+          ln -s -- "$BASE/shared/.env" "$RELEASE_DIR/.env"
+          ln -s -- "$BASE/shared/storage" "$RELEASE_DIR/storage"
+
+          cd "$RELEASE_DIR"
+          PHASE="database migrations"
+          php artisan migrate --force
+          PHASE="Laravel cache preparation"
+          php artisan config:cache
+          PHASE="IndexNow key file generation"
+          php artisan indexnow:publish-key-file
+          php artisan storage:link
+          php artisan route:cache
+          php artisan view:cache
+
+          PHASE="atomic release activation"
+          NEXT_LINK="$BASE/.current-$RELEASE"
+          ln -s -- "$RELEASE_DIR" "$NEXT_LINK"
+          if ! mv -Tf -- "$NEXT_LINK" "$CURRENT"; then
+            rm -f -- "$NEXT_LINK"
+            echo "Could not atomically switch production/current; the prior target was left in place." >&2
+            exit 1
+          fi
+          trap - ERR
+
+          PHASE="old-release cleanup"
+          release_dirs=()
+          for candidate in "$BASE"/releases/*; do
+            [[ -d "$candidate" ]] || continue
+            candidate_name="${candidate##*/}"
+            [[ "$candidate_name" =~ ^[0-9]{14}-[0-9]+-[0-9]+$ ]] || continue
+            release_dirs+=("$candidate")
+          done
+
+          if (( ${#release_dirs[@]} > 0 )); then
+            cleanup_list="$BASE/.release-cleanup-$RELEASE"
+            if printf '%s\n' "${release_dirs[@]}" | LC_ALL=C sort -r > "$cleanup_list"; then
+              index=0
+              while IFS= read -r old_release; do
+                if (( index >= 5 )) && [[ "$old_release" != "$RELEASE_DIR" ]]; then
+                  if ! rm -rf -- "$old_release"; then
+                    echo "Warning: could not remove an old release; the active release remains available." >&2
+                  fi
+                fi
+                index=$((index + 1))
+              done < "$cleanup_list"
+            else
+              echo "Warning: could not sort old releases for cleanup; the active release remains available." >&2
+            fi
+            if ! rm -f -- "$cleanup_list"; then
+              echo "Warning: could not remove the temporary release-cleanup list." >&2
+            fi
+          fi
+
+          echo "Activated release $RELEASE."
+          REMOTE_SCRIPT
