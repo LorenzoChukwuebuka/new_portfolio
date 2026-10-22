@@ -6,6 +6,7 @@
         "build": "vite build",
         "dev": "vite",
         "typecheck": "vue-tsc --noEmit",
+        "test:e2e:nav": "node scripts/run-mobile-navigation-tests.mjs",
         "check:contrast": "node scripts/check-token-contrast.mjs",
         "verify:build": "node scripts/verify-vite-build.mjs",
         "smoke:production": "node scripts/smoke-production.mjs"
