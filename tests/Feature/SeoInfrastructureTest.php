@@ -34,6 +34,7 @@ test('the sitemap is valid xml with the correct content type and canonical stati
     expect($locations)->not->toContain('https://canonical.example/sitemap.xml');
     expect($locations)->not->toContain('https://canonical.example/robots.txt');
     expect($locations)->not->toContain('https://canonical.example/admin');
+    expect($locations)->not->toContain('https://canonical.example/_design');
     expect($locations)->not->toContain('https://canonical.example/blog/{slug}');
     expect($response->getContent())->not->toContain('<lastmod>');
 });
@@ -207,7 +208,7 @@ test('public content has server rendered metadata and detail content while unkno
     ]);
 
     $response = $this->get('/blog/'.$post->slug)->assertOk();
-    $response->assertSee('<h1 class="mb-5 text-4xl font-bold">Server rendered title</h1>', false);
+    $response->assertSee('<h1>Server rendered title</h1>', false);
     $response->assertSee('The article body is present before Vue runs.');
     $response->assertSee('<link rel="canonical" href="https://canonical.example/blog/server-rendered-title">', false);
     $response->assertSee('noindex, nofollow');
@@ -217,7 +218,7 @@ test('public content has server rendered metadata and detail content while unkno
     $this->get('/admin/login')->assertOk()->assertSee('noindex, nofollow');
 });
 
-test('public listing pages include database content in the initial response and Vue props', function () {
+test('public listing pages include database content in the initial response', function () {
     Post::create([
         'title' => 'Initial HTML post',
         'slug' => 'initial-html-post',
@@ -241,20 +242,16 @@ test('public listing pages include database content in the initial response and 
         ->assertOk()
         ->assertSee('I build reliable software for serious teams.')
         ->assertSee('Initial HTML project')
-        ->assertSee('Initial HTML post')
-        ->assertSee('initial-projects', false)
-        ->assertSee('initial-posts', false);
+        ->assertSee('Initial HTML post');
 
     $this->get('/blog')
         ->assertOk()
         ->assertSee('Initial HTML post')
-        ->assertSee('initial-posts', false)
         ->assertDontSee('Long body omitted from the listing response.');
 
     $this->get('/projects')
         ->assertOk()
-        ->assertSee('Initial HTML project')
-        ->assertSee('initial-projects', false);
+        ->assertSee('Initial HTML project');
 });
 
 test('project detail metadata and CreativeWork structured data match the canonical record', function () {
@@ -270,7 +267,7 @@ test('project detail metadata and CreativeWork structured data match the canonic
 
     $response = $this->get('/projects/'.$project->slug)->assertOk();
     $response->assertSee('<link rel="canonical" href="https://canonical.example/projects/structured-data-project">', false);
-    $response->assertSee('<h1 class="mb-5 text-4xl font-bold">Structured data project</h1>', false);
+    $response->assertSee('<h1>Structured data project</h1>', false);
 
     preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/s', $response->getContent(), $matches);
     $schemas = array_map(
