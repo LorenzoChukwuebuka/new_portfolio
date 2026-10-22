@@ -1,262 +1,86 @@
 <template>
   <Layout page-title="Tags">
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-sm text-gray-600">Manage your blog tags</p>
-        </div>
-        <button
-          @click="openModal()"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Add Tag
-        </button>
+      <PageHeader title="Tags" description="Use tags to connect related posts and projects."><template #actions><Button @click="openModal()">Add tag</Button></template></PageHeader>
+      <ErrorBanner v-if="error" :message="error" :retry="fetchTags" />
+      <AdminLoader v-if="loading && tags.length === 0" title="Loading tags" message="Fetching tag records." :rows="4" />
+      <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Card v-for="tag in tags" :key="tag.id" class="space-y-4 p-5">
+          <div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="truncate text-lg font-semibold text-adm-ink">{{ tag.name }}</h2><p class="mt-1 text-sm text-adm-ink-muted">{{ tag.type || 'General' }}</p></div><Badge>{{ totalUsage(tag) }} uses</Badge></div>
+          <div class="flex flex-wrap gap-2"><Badge variant="info">{{ tag.posts_count || 0 }} posts</Badge><Badge variant="neutral">{{ tag.projects_count || 0 }} projects</Badge></div>
+          <div class="flex justify-end gap-2 border-t border-adm-line pt-3"><Button size="sm" variant="secondary" @click="openModal(tag)">Edit</Button><Button size="sm" variant="danger" :disabled="totalUsage(tag) > 0" :title="totalUsage(tag) ? 'Remove this tag from posts and projects before deleting' : 'Delete tag'" @click="deleteTag(tag)">Delete</Button></div>
+          <p v-if="totalUsage(tag)" class="text-xs text-adm-ink-muted">Remove this tag from its {{ totalUsage(tag) }} assigned item{{ totalUsage(tag) === 1 ? '' : 's' }} before deleting it.</p>
+        </Card>
+        <EmptyState v-if="tags.length === 0 && !loading" title="No tags yet" description="Create tags to connect related content." />
       </div>
-
-      <AdminLoader
-        v-if="loading"
-        title="Loading tags"
-        message="Fetching tag records."
-        :rows="5"
-      />
-
-      <!-- Tags List -->
-      <div v-else class="bg-white rounded-lg border border-gray-200">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Name
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Description
-                </th>
-                <th
-                  class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="tag in tags" :key="tag.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-medium text-gray-900">
-                    {{ tag.name }}
-                  </div>
-                </td>
-
-                <td class="px-6 py-4">
-                  <div class="text-sm text-gray-500 max-w-md truncate">
-                    {{ tag.description || "-" }}
-                  </div>
-                </td>
-
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2"
-                >
-                  <button
-                    @click="openModal(tag)"
-                    class="text-blue-600 hover:text-blue-900"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    @click="deleteTag(tag)"
-                    class="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Modal :open="isOpen" :title="editing ? 'Edit tag' : 'Add tag'" @close="closeModal">
+        <form class="space-y-4" @submit.prevent="saveTag">
+          <p v-if="formError" role="alert" class="rounded-md border border-adm-danger-ink/30 bg-adm-danger-bg p-3 text-sm text-adm-danger-ink">{{ formError }}</p>
+          <Field id="tag-name" label="Name" :error="errors.name" required><Input id="tag-name" v-model="form.name" required :error="errors.name" autocomplete="off" /></Field>
+          <Field id="tag-type" label="Type" hint="Optional grouping label, such as technology or topic." :error="errors.type"><Input id="tag-type" v-model="form.type" :error="errors.type" autocomplete="off" /></Field>
+          <div class="flex justify-end gap-2"><Button type="button" variant="secondary" @click="closeModal">Cancel</Button><Button type="submit" :disabled="saving">{{ saving ? 'Saving…' : 'Save tag' }}</Button></div>
+        </form>
+      </Modal>
     </div>
-
-    <!-- Modal -->
-    <TransitionRoot :show="isOpen" as="template">
-      <Dialog @close="closeModal" class="relative z-50">
-        <TransitionChild
-          enter="ease-out duration-300"
-          enter-from="opacity-0"
-          enter-to="opacity-100"
-          leave="ease-in duration-200"
-          leave-from="opacity-100"
-          leave-to="opacity-0"
-        >
-          <div class="fixed inset-0 bg-black bg-opacity-25" />
-        </TransitionChild>
-
-        <div class="fixed inset-0 overflow-y-auto">
-          <div class="flex min-h-full items-center justify-center p-4">
-            <TransitionChild
-              enter="ease-out duration-300"
-              enter-from="opacity-0 scale-95"
-              enter-to="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leave-from="opacity-100 scale-100"
-              leave-to="opacity-0 scale-95"
-            >
-              <DialogPanel
-                class="w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 shadow-xl transition-all"
-              >
-                <DialogTitle class="text-lg font-semibold text-gray-900 mb-4">
-                  {{ editingTag ? "Edit Tag" : "Add Tag" }}
-                </DialogTitle>
-
-                <form @submit.prevent="saveTag" class="space-y-4">
-                  <!-- Name -->
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                      Name <span class="text-red-500">*</span>
-                    </label>
-                    <input
-                      v-model="form.name"
-                      required
-                      type="text"
-                      class="w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="VueJS"
-                    />
-                  </div>
-
-                  <!-- Description -->
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      v-model="form.description"
-                      rows="3"
-                      class="w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Optional description"
-                    />
-                  </div>
-
-                  <!-- Actions -->
-                  <div class="flex justify-end space-x-3 pt-4">
-                    <button
-                      type="button"
-                      @click="closeModal"
-                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-
-                    <button
-                      type="submit"
-                      :disabled="saving"
-                      class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {{ saving ? "Saving..." : "Save" }}
-                    </button>
-                  </div>
-                </form>
-              </DialogPanel>
-            </TransitionChild>
-          </div>
-        </div>
-      </Dialog>
-    </TransitionRoot>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  TransitionRoot,
-  TransitionChild,
-} from "@headlessui/vue";
-import Layout from "../components/Layout.vue";
-import AdminLoader from "../components/AdminLoader.vue";
-import api from "../utils/api";
-//import type { Tag } from "../types";
+import { onMounted, ref } from 'vue'
+import Layout from '../components/Layout.vue'
+import AdminLoader from '../components/AdminLoader.vue'
+import api, { apiErrorMessage, fieldErrors } from '../utils/api'
+import { confirmAction, showToast } from '../ui/feedback'
+import PageHeader from '../ui/PageHeader.vue'
+import Button from '../ui/Button.vue'
+import Card from '../ui/Card.vue'
+import Badge from '../ui/Badge.vue'
+import Field from '../ui/Field.vue'
+import Input from '../ui/Input.vue'
+import Modal from '../ui/Modal.vue'
+import EmptyState from '../ui/EmptyState.vue'
+import ErrorBanner from '../ui/ErrorBanner.vue'
 
-export interface Tag {
-  id?: number;
-  name: string;
-  description?: string;
+interface TagRecord { id?:number; name:string; type?:string; posts_count?:number; projects_count?:number }
+const tags = ref<TagRecord[]>([])
+const editing = ref<TagRecord|null>(null)
+const isOpen = ref(false)
+const loading = ref(true)
+const saving = ref(false)
+const error = ref('')
+const formError = ref('')
+const errors = ref<Record<string,string>>({})
+const form = ref<TagRecord>({ name:'', type:'' })
+onMounted(fetchTags)
+
+async function fetchTags() {
+  loading.value = true; error.value = ''
+  try { const { data } = await api.get('/admin/tags', { params:{ per_page:50 } }); tags.value = data.data }
+  catch (reason) { error.value = apiErrorMessage(reason) }
+  finally { loading.value = false }
 }
-
-const tags = ref<Tag[]>([]);
-const isOpen = ref(false);
-const editingTag = ref<Tag | null>(null);
-const saving = ref(false);
-const loading = ref(true);
-
-const form = ref<Tag>({
-  name: "",
-  description: "",
-});
-
-onMounted(async () => {
-  await fetchTags();
-});
-
-const fetchTags = async () => {
-  loading.value = true;
+function totalUsage(tag:TagRecord) { return (tag.posts_count || 0) + (tag.projects_count || 0) }
+function openModal(tag?:TagRecord) {
+  editing.value = tag || null
+  form.value = tag ? { name:tag.name, type:tag.type || '' } : { name:'', type:'' }
+  formError.value = ''; errors.value = {}; isOpen.value = true
+}
+function closeModal() { isOpen.value = false; editing.value = null; errors.value = {}; formError.value = '' }
+async function saveTag() {
+  saving.value = true; errors.value = {}; formError.value = ''
   try {
-    const { data } = await api.get("/admin/tags");
-    tags.value = data.data;
-  } finally {
-    loading.value = false;
-  }
-};
-
-const openModal = (tag?: Tag) => {
-  if (tag) {
-    editingTag.value = tag;
-    form.value = { ...tag };
-  } else {
-    editingTag.value = null;
-    form.value = { name: "", description: "" };
-  }
-  isOpen.value = true;
-};
-
-const closeModal = () => {
-  isOpen.value = false;
-  editingTag.value = null;
-  form.value = { name: "", description: "" };
-};
-
-const saveTag = async () => {
-  saving.value = true;
-  try {
-    if (editingTag.value) {
-      await api.put(`/admin/tags/${editingTag.value.id}`, form.value);
-    } else {
-      await api.post("/admin/tags", form.value);
-    }
-    await fetchTags();
-    closeModal();
-  } catch (error:any) {
-    alert(error.response?.data?.message || "An error occurred");
-  } finally {
-    saving.value = false;
-  }
-};
-
-const deleteTag = async (tag: Tag) => {
-  if (!confirm(`Are you sure you want to delete "${tag.name}"?`)) return;
-
-  try {
-    await api.delete(`/admin/tags/${tag.id}`);
-    await fetchTags();
-  } catch (error:any) {
-    alert(error.response?.data?.message || "An error occurred");
-  }
-};
+    if (editing.value?.id) await api.put(`/admin/tags/${editing.value.id}`, form.value)
+    else await api.post('/admin/tags', form.value)
+    await fetchTags(); closeModal(); showToast('Tag saved.')
+  } catch (reason) {
+    errors.value = fieldErrors(reason)
+    formError.value = apiErrorMessage(reason)
+  } finally { saving.value = false }
+}
+async function deleteTag(tag:TagRecord) {
+  if (totalUsage(tag)) return
+  if (!await confirmAction(`Delete “${tag.name}”?`)) return
+  try { await api.delete(`/admin/tags/${tag.id}`); await fetchTags(); showToast('Tag deleted.') }
+  catch (reason) { showToast(apiErrorMessage(reason), 'error') }
+}
 </script>
