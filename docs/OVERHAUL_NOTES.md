@@ -89,3 +89,54 @@ old branch.
 - Screenshot artifacts remain in `/tmp` as requested and are not checked in.
 - npm reported dependency advisories during `npm ci`; no forced or breaking
   audit upgrade was applied as part of this visual and behavior overhaul.
+
+## Production rendering incident — 2026-10-22
+
+- The homepage source itself was intact: Blade returned the expected server
+  rendered content and SEO metadata, but its HTML referenced old hashed Vite
+  files. Those URLs returned Litehost HTML 404 pages, so the browser displayed
+  the SEO content without its visual styling or Vue behavior. The active
+  release's `public/build/manifest.json` and all files named by that manifest
+  were present and served with the expected CSS, JavaScript, and font MIME
+  types. The broken response therefore came from stale rendered HTML/runtime
+  state across an atomic `production/current` symlink activation, rather than
+  a missing build or incorrect `public_html/public` mapping.
+- Restarting the Litehost PHP container refreshed that stale state without
+  changing the release or document-root symlinks. The homepage then served the
+  active manifest's asset hashes; its dark styling, self-hosted fonts, hero
+  image, navigation, and Vue contact island rendered in the live browser. This
+  points to retained PHP worker/realpath/view state after symlink activation;
+  the workflow now verifies active commit and asset identity to detect that
+  condition instead of assuming `/up` is sufficient.
+- The production document-root arrangement was left untouched: `public_html`
+  rewrites through its existing `.htaccess` to `public/`, and
+  `public_html/public` follows `production/current/public`. Candidate deploy
+  validation now resolves and checks these exact relationships before
+  activation. No production database, shared storage, `.env`, or symlink was
+  changed during diagnosis.
+- Deployment candidates now carry matching commit/release markers in the
+  release root and public build directory, including manifest and Composer
+  lock checksums. Before activation, the workflow validates every manifest
+  output and entry point on the server. After activation, Playwright verifies
+  served asset bytes/types, release markers, Blade metadata, page rendering,
+  Vue islands, navigation, mobile overflow, SEO routes, and expected 404s.
+  A failed post-activation smoke restores the captured previous release only
+  when `production/current` still points to the failed candidate, and writes a
+  failure record; database and shared storage remain in place. Old releases
+  are cleaned only after the smoke passes.
+- `npm run verify:build` validates the local Vite manifest and required site
+  and admin entries before upload. `npm run smoke:production` supports local
+  `SMOKE_BASE_URL` checks, while the deploy job requires production indexability
+  and the exact workflow commit. Playwright is a development-only dependency
+  used by CI, not a production runtime dependency.
+- A separate live metadata check found double-escaped entities in the page
+  title/social metadata. The shared public Blade layout now normalizes one
+  already-escaped layer before its normal escaped output; the SEO feature test
+  guards the title output. Server-rendered article/content and SEO markup were
+  retained.
+- Incident verification before the corrective workflow deployment: active
+  public routes and SEO endpoints returned HTTP 200, unknown paths returned
+  404, production assets matched the served manifest after the Litehost
+  restart, and a live browser confirmed the styled page and loaded fonts. Full
+  deployment run, commit, release ID, and post-activation checks are recorded
+  below after the workflow has run.
