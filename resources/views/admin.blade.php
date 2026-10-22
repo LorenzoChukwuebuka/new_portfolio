@@ -8,17 +8,32 @@
     <meta name="robots" content="noindex, nofollow">
     <meta name="googlebot" content="noindex, nofollow">
 
+    <script>
+        (() => {
+            const saved = localStorage.getItem('admin_theme');
+            const theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+        })();
+    </script>
+
     <title>@yield('title', 'Lorenzo Chukwuebuka Obi - Admin')</title>
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    @php
+        $manifestPath = public_path('build/manifest.json');
+        $fontManifest = is_file($manifestPath)
+            ? (json_decode(file_get_contents($manifestPath), true) ?: [])
+            : [];
+        $bodyFont = $fontManifest['node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2'] ?? null;
+    @endphp
+    @if ($bodyFont)
+        <link rel="preload" as="font" type="font/woff2" href="{{ asset('build/'.$bodyFont['file']) }}" crossorigin>
+    @endif
 
     <!-- Styles -->
-    @vite(['resources/css/app.css', 'resources/js/app.ts'])
+    @vite('resources/js/app.ts')
 </head>
 
-<body>
+<body data-admin>
     <div id="app">
        <app></app>
     </div>

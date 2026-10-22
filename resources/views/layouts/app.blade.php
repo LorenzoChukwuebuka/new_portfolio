@@ -45,9 +45,19 @@
 
     <link rel="icon" href="{{ asset('/storage/images/profile.jpg') }}" type="image/png">
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    @php
+        $manifestPath = public_path('build/manifest.json');
+        $fontManifest = is_file($manifestPath)
+            ? (json_decode(file_get_contents($manifestPath), true) ?: [])
+            : [];
+        $preloadFonts = collect($fontManifest)->only([
+            'node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2',
+            'node_modules/@fontsource-variable/playfair-display/files/playfair-display-latin-wght-normal.woff2',
+        ]);
+    @endphp
+    @foreach ($preloadFonts as $font)
+        <link rel="preload" as="font" type="font/woff2" href="{{ asset('build/'.$font['file']) }}" crossorigin>
+    @endforeach
 
     <meta name="description" content="{{ $seoDescription }}">
     <meta name="author" content="{{ $__env->yieldContent('author', 'Lorenzo Chukwuebuka Obi') }}">
@@ -80,7 +90,7 @@
 
 
     <!-- Styles -->
-    @vite(['resources/css/app.css', 'resources/js/app.ts'])
+    @vite('resources/js/app.ts')
 </head>
 
 <body>
