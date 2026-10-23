@@ -5,6 +5,10 @@ on:
     branches:
       - main
     paths-ignore:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/indexnow.yml'
+      - 'playwright.config.ts'
+      - 'tests/**'
       - 'docs/**'
       - README.md
 
@@ -44,6 +48,9 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
+
+      - name: Create local test environment file
+        run: cp .env.example .env
 
       - name: Run Laravel test suite
         env:
