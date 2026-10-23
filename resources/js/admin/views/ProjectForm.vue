@@ -3,7 +3,7 @@
     <div class="admin-page pb-24 lg:pb-0">
       <PageHeader :title="isEditing ? 'Edit project' : 'New project'" description="Build a useful case study with clear details and optional public links." breadcrumb="Content / Projects"/>
       <ErrorBanner v-if="failure" class="mb-4" :message="failure"/>
-      <form class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]" @submit.prevent="saveProject">
+      <form id="project-form" class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]" @submit.prevent="saveProject">
         <div class="grid gap-5">
           <Card><h2 class="mb-4 text-base font-semibold">Project details</h2><div class="grid gap-4">
             <Field id="project-title" label="Title" required :error="errors.title"><Input id="project-title" v-model="form.title" :error="errors.title" autocomplete="off"/></Field>
@@ -18,8 +18,8 @@
           <Card><div class="mb-4 flex items-center justify-between"><h2 class="text-base font-semibold">Publish settings</h2><Badge :variant="form.status==='completed'?'success':form.status==='archived'?'neutral':'warning'">{{ form.status.replace('-', ' ') }}</Badge></div><div class="grid gap-4"><Field id="project-status" label="Status"><Select id="project-status" v-model="form.status"><option value="in-progress">In progress</option><option value="completed">Completed</option><option value="archived">Archived</option></Select></Field><Field id="project-date" label="Completed on"><Input id="project-date" v-model="form.completed_at" type="date"/></Field><Field id="project-order" label="Display order"><Input id="project-order" v-model.number="form.order" type="number" min="0"/></Field><Switch id="project-featured" v-model="form.is_featured">Feature this project</Switch></div><div class="mt-5 grid gap-2"><Button type="submit" :loading="saving">{{ isEditing?'Save changes':'Create project' }}</Button><router-link to="/admin/projects" class="flex min-h-10 items-center justify-center rounded-md border border-adm-line text-sm font-semibold hover:bg-adm-surface-2">Cancel</router-link></div></Card>
           <Card><h2 class="mb-4 text-base font-semibold">Images</h2><Field id="project-thumb" label="Project thumbnail"><ImageUpload :existing="thumbnailUrl" @update:file="form.thumbnail=$event" @remove-existing="removeThumbnail=$event"/></Field><Field id="project-image" class="mt-4" label="Main project image"><ImageUpload :existing="mainImageUrl" @update:file="form.main_image=$event" @remove-existing="removeMainImage=$event"/></Field></Card>
         </aside>
-        <div class="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-adm-line bg-adm-surface/95 p-3 backdrop-blur xl:hidden"><router-link to="/admin/projects" class="flex min-h-11 flex-1 items-center justify-center rounded-md border border-adm-line text-sm">Cancel</router-link><Button type="submit" class="flex-1" :loading="saving">{{ isEditing?'Save changes':'Create project' }}</Button></div>
       </form>
+      <Teleport to="body"><div class="fixed inset-x-0 bottom-0 z-[var(--z-action-bar)] flex gap-2 border-t border-adm-line bg-adm-surface/95 p-3 backdrop-blur xl:hidden"><router-link to="/admin/projects" class="flex min-h-11 flex-1 items-center justify-center rounded-md border border-adm-line text-sm">Cancel</router-link><Button type="submit" form="project-form" class="flex-1" :loading="saving">{{ isEditing?'Save changes':'Create project' }}</Button></div></Teleport>
     </div>
   </Layout>
 </template>

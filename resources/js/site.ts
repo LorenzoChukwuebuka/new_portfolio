@@ -44,40 +44,124 @@ function mountIslands() {
 function initMobileNavigation() {
   const toggle = document.querySelector<HTMLButtonElement>('[data-menu-toggle]')
   const drawer = document.querySelector<HTMLElement>('#site-mobile-nav')
-  const closeButton = drawer?.querySelector<HTMLButtonElement>('[data-menu-close]')
-  if (!toggle || !drawer || !closeButton) return
+  const toggleLabel = toggle?.querySelector<HTMLElement>('[data-menu-toggle-label]')
+  if (!toggle || !drawer || !toggleLabel) return
 
-  let returnFocus: HTMLElement = toggle
-  const focusable = () => Array.from(drawer.querySelectorAll<HTMLElement>(
+  const desktopNavigation = window.matchMedia('(min-width: 1025px)')
+  let isOpen = false
+  let closeTimer = 0
+  let scrollY = 0
+  let savedHtmlOverflow = ''
+  let savedBodyStyles: Record<'position' | 'top' | 'left' | 'right' | 'width' | 'overflow', string> | null = null
+  let backgroundState: { element: HTMLElement; inert: boolean; ariaHidden: string | null }[] = []
+  const focusable = () => [toggle, ...Array.from(drawer.querySelectorAll<HTMLElement>(
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-  ))
+  ))].filter((element) => !element.hidden && element.tabIndex >= 0)
 
-  const close = () => {
-    if (drawer.hidden) return
-    drawer.hidden = true
+  const setBackgroundInert = (inert: boolean) => {
+    if (inert) {
+      backgroundState = Array.from(document.querySelectorAll<HTMLElement>('main, footer')).map((element) => ({
+        element,
+        inert: element.inert,
+        ariaHidden: element.getAttribute('aria-hidden'),
+      }))
+      backgroundState.forEach(({ element }) => {
+        element.inert = true
+        element.setAttribute('aria-hidden', 'true')
+      })
+      return
+    }
+
+    backgroundState.forEach(({ element, inert: wasInert, ariaHidden }) => {
+      element.inert = wasInert
+      if (ariaHidden === null) element.removeAttribute('aria-hidden')
+      else element.setAttribute('aria-hidden', ariaHidden)
+    })
+    backgroundState = []
+  }
+
+  const lockScroll = () => {
+    scrollY = window.scrollY
+    savedHtmlOverflow = document.documentElement.style.overflow
+    savedBodyStyles = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      left: document.body.style.left,
+      right: document.body.style.right,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow,
+    }
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.width = '100%'
+    document.body.style.overflow = 'hidden'
+  }
+
+  const unlockScroll = () => {
+    if (!savedBodyStyles) return
+    document.documentElement.style.overflow = savedHtmlOverflow
+    Object.assign(document.body.style, savedBodyStyles)
+    savedBodyStyles = null
+    window.scrollTo(0, scrollY)
+  }
+
+  const finishClose = () => {
+    if (!isOpen) drawer.hidden = true
+  }
+
+  const close = (restoreToggleFocus = true) => {
+    if (!isOpen) return
+    isOpen = false
+    drawer.dataset.open = 'false'
+    drawer.inert = true
+    drawer.setAttribute('aria-hidden', 'true')
     toggle.setAttribute('aria-expanded', 'false')
-    toggle.setAttribute('aria-label', 'Open navigation menu')
-    document.body.classList.remove('menu-open')
-    document.querySelectorAll<HTMLElement>('main, footer').forEach((element) => { element.inert = false })
-    returnFocus.focus()
+    toggle.setAttribute('aria-label', 'Open menu')
+    toggleLabel.textContent = 'Menu'
+    unlockScroll()
+    setBackgroundInert(false)
+
+    if (restoreToggleFocus && !desktopNavigation.matches) toggle.focus({ preventScroll: true })
+    else if (desktopNavigation.matches) document.querySelector<HTMLAnchorElement>('.site-nav__links a')?.focus({ preventScroll: true })
+
+    window.clearTimeout(closeTimer)
+    closeTimer = window.setTimeout(finishClose, 300)
   }
 
   const open = () => {
-    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : toggle
+    if (isOpen || desktopNavigation.matches) return
+    isOpen = true
+    window.clearTimeout(closeTimer)
     drawer.hidden = false
+    drawer.inert = false
+    drawer.removeAttribute('aria-hidden')
     toggle.setAttribute('aria-expanded', 'true')
-    toggle.setAttribute('aria-label', 'Close navigation menu')
-    document.body.classList.add('menu-open')
-    document.querySelectorAll<HTMLElement>('main, footer').forEach((element) => { element.inert = true })
-    closeButton.focus()
+    toggle.setAttribute('aria-label', 'Close menu')
+    toggleLabel.textContent = 'Close ×'
+    lockScroll()
+    setBackgroundInert(true)
+    window.requestAnimationFrame(() => {
+      if (isOpen) drawer.dataset.open = 'true'
+    })
+    drawer.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus({ preventScroll: true })
   }
 
-  toggle.addEventListener('click', () => drawer.hidden ? open() : close())
-  closeButton.addEventListener('click', close)
-  drawer.querySelectorAll('[data-menu-link]').forEach((link) => link.addEventListener('click', close))
+  toggle.addEventListener('click', () => isOpen ? close() : open())
+  drawer.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((link) => link.addEventListener('click', () => {
+    close()
+    window.setTimeout(() => {
+      if (!isOpen && !desktopNavigation.matches) toggle.focus({ preventScroll: true })
+    }, 0)
+  }))
+  drawer.addEventListener('transitionend', (event) => {
+    if (event.target === drawer && event.propertyName === 'opacity' && !isOpen) finishClose()
+  })
 
   document.addEventListener('keydown', (event) => {
-    if (drawer.hidden) return
+    if (!isOpen) return
     if (event.key === 'Escape') {
       event.preventDefault()
       close()
@@ -85,16 +169,19 @@ function initMobileNavigation() {
     }
     if (event.key !== 'Tab') return
     const items = focusable()
-    const first = items[0]
     const last = items[items.length - 1]
-    if (!first || !last) return
-    if (event.shiftKey && document.activeElement === first) {
+    if (!last) return
+    if (event.shiftKey && document.activeElement === toggle) {
       event.preventDefault()
       last.focus()
     } else if (!event.shiftKey && document.activeElement === last) {
       event.preventDefault()
-      first.focus()
+      toggle.focus()
     }
+  })
+
+  desktopNavigation.addEventListener('change', (event) => {
+    if (event.matches) close(false)
   })
 }
 
