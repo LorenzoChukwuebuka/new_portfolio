@@ -23,6 +23,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       APP_ENV: 'testing',
+      APP_KEY: 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       DB_CONNECTION: 'sqlite',
       DB_DATABASE: testDatabase,
       DB_URL: '',

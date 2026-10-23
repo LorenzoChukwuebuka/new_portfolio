@@ -34,11 +34,6 @@ jobs:
           npm run verify:build
           npm run typecheck
 
-      - name: Install Chromium and verify mobile navigation
-        run: |
-          npx playwright install --with-deps chromium
-          npm run test:e2e:nav
-
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -54,6 +49,11 @@ jobs:
         run: |
           composer install --prefer-dist --no-interaction --optimize-autoloader
           composer test
+
+      - name: Install Chromium and verify mobile navigation
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e:nav
 
       - name: Test deployment scripts with isolated releases
         run: bash tests/deployment-scripts.sh
