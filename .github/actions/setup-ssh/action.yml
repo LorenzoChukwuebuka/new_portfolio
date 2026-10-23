@@ -1,0 +1,40 @@
+name: Configure and verify pinned Litehost SSH
+description: Validate the configured SSH key pair, pinned host key, endpoint, and authentication.
+inputs:
+  host:
+    description: Litehost SSH hostname or IPv4 address.
+    required: true
+  username:
+    description: Litehost SSH account name.
+    required: true
+  private-key:
+    description: SSH private key from GitHub Secrets.
+    required: true
+  public-key:
+    description: Matching SSH public key from GitHub Secrets.
+    required: true
+  known-hosts:
+    description: Independently verified SSH host key from GitHub Secrets.
+    required: true
+  port:
+    description: SSH port from the CPANEL_SSH_PORT repository variable; uses the shared default when empty.
+    required: false
+    default: ''
+outputs:
+  ssh_config:
+    description: Path to the strict, pinned SSH configuration for this runner.
+    value: ${{ steps.verify.outputs.ssh_config }}
+runs:
+  using: composite
+  steps:
+    - id: verify
+      name: Verify endpoint trust and key pair
+      shell: bash
+      env:
+        DEPLOY_HOST: ${{ inputs.host }}
+        DEPLOY_USER: ${{ inputs.username }}
+        DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.private-key }}
+        DEPLOY_SSH_PUBLIC_KEY: ${{ inputs.public-key }}
+        DEPLOY_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+        DEPLOY_SSH_PORT: ${{ inputs.port }}
+      run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-ssh.sh"

@@ -1,0 +1,50 @@
+name: IndexNow production operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Run a key verification or the guarded one-time sitemap submission.
+        required: true
+        type: choice
+        options:
+          - verify-key
+          - submit-existing
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litehost-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  indexnow:
+    name: Run selected IndexNow command
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out operation scripts
+        uses: actions/checkout@v4
+
+      - name: Configure strict Litehost SSH access
+        id: ssh
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.CPANEL_USER }}
+          private-key: ${{ secrets.CPANEL_SSH_SECRET }}
+          public-key: ${{ secrets.CPANEL_PUBLIC_KEY }}
+          known-hosts: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+          port: ${{ vars.CPANEL_SSH_PORT }}
+
+      - name: Execute selected production operation
+        env:
+          DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+          INDEXNOW_OPERATION: ${{ inputs.operation }}
+        run: |
+          set -euo pipefail
+          source .github/scripts/deployment-config.sh
+          ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" bash -s -- \
+            "$DEPLOY_REMOTE_ROOT_NAME" "$DEPLOY_CURRENT_LINK" \
+            "$INDEXNOW_OPERATION" < .github/scripts/indexnow-production.sh

@@ -1,0 +1,164 @@
+name: Deploy a validated Litehost release
+description: Verify the current environment, upload and prepare a candidate, activate it, verify production, roll back on failure, and clean old releases.
+inputs:
+  host:
+    description: Litehost SSH hostname or IPv4 address.
+    required: true
+  username:
+    description: Litehost SSH account name.
+    required: true
+  private-key:
+    description: SSH private key from GitHub Secrets.
+    required: true
+  public-key:
+    description: Matching SSH public key from GitHub Secrets.
+    required: true
+  known-hosts:
+    description: Independently verified SSH host key from GitHub Secrets.
+    required: true
+  ssh-port:
+    description: SSH port from the CPANEL_SSH_PORT repository variable.
+    required: false
+    default: ''
+  commit:
+    description: Source commit SHA for the candidate release.
+    required: true
+  release-id:
+    description: Unique timestamped release identifier.
+    required: true
+  artifact-path:
+    description: Path to the validated release tarball on the runner.
+    required: true
+outputs:
+  previous-release:
+    description: Release path captured before activation, used as the rollback target.
+    value: ${{ steps.environment.outputs.previous_release }}
+runs:
+  using: composite
+  steps:
+    - id: ssh
+      name: Configure strict SSH access
+      uses: ./.github/actions/setup-ssh
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        private-key: ${{ inputs.private-key }}
+        public-key: ${{ inputs.public-key }}
+        known-hosts: ${{ inputs.known-hosts }}
+        port: ${{ inputs.ssh-port }}
+
+    - id: environment
+      name: Verify Litehost environment and rollback target
+      shell: bash
+      env:
+        DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+      run: |
+        set -euo pipefail
+        source .github/scripts/deployment-config.sh
+        if remote_output="$(ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" bash -s -- \
+          "$DEPLOY_REMOTE_ROOT_NAME" "$DEPLOY_RELEASES_DIRECTORY" \
+          "$DEPLOY_SHARED_DIRECTORY" "$DEPLOY_CURRENT_LINK" "$DEPLOY_BASE_URL" \
+          < .github/scripts/verify-environment.sh 2>&1)"; then
+          printf '%s\n' "$remote_output"
+        else
+          status=$?
+          printf '%s\n' "$remote_output"
+          echo "::error::Litehost environment verification failed before upload (exit $status)."
+          exit "$status"
+        fi
+        previous_release="$(printf '%s\n' "$remote_output" | sed -n 's/^PREVIOUS_RELEASE=//p' | tail -n 1)"
+        previous_name="${previous_release##*/}"
+        if [[ ! "$previous_name" =~ ^[0-9]{14}-[0-9]+-[0-9]+$ ]]; then
+          echo "::error::Litehost did not return a valid active release for rollback."
+          exit 1
+        fi
+        printf 'previous_release=%s\n' "$previous_release" >> "$GITHUB_OUTPUT"
+
+    - name: Upload candidate files
+      shell: bash
+      env:
+        DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+        DEPLOY_RELEASE_ID: ${{ inputs.release-id }}
+        DEPLOY_COMMIT: ${{ inputs.commit }}
+        DEPLOY_ARTIFACT_PATH: ${{ inputs.artifact-path }}
+      run: bash .github/scripts/upload-release.sh
+
+    - name: Prepare candidate and run compatible migrations
+      shell: bash
+      env:
+        DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+        DEPLOY_RELEASE_ID: ${{ inputs.release-id }}
+        DEPLOY_COMMIT: ${{ inputs.commit }}
+        PREVIOUS_RELEASE: ${{ steps.environment.outputs.previous_release }}
+      run: |
+        set -euo pipefail
+        source .github/scripts/deployment-config.sh
+        ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" bash -s -- \
+          "$DEPLOY_REMOTE_ROOT_NAME" "$DEPLOY_RELEASES_DIRECTORY" \
+          "$DEPLOY_SHARED_DIRECTORY" "$DEPLOY_CURRENT_LINK" \
+          "$DEPLOY_COMMIT" "$DEPLOY_RELEASE_ID" "$DEPLOY_BASE_URL" \
+          "$PREVIOUS_RELEASE" \
+          < .github/scripts/prepare-release.sh
+
+    - id: activate
+      name: Atomically activate the prepared candidate
+      shell: bash
+      env:
+        DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+        DEPLOY_RELEASE_ID: ${{ inputs.release-id }}
+        DEPLOY_COMMIT: ${{ inputs.commit }}
+        PREVIOUS_RELEASE: ${{ steps.environment.outputs.previous_release }}
+      run: |
+        set -euo pipefail
+        source .github/scripts/deployment-config.sh
+        ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" bash -s -- \
+          "$DEPLOY_REMOTE_ROOT_NAME" "$DEPLOY_RELEASES_DIRECTORY" \
+          "$DEPLOY_CURRENT_LINK" "$DEPLOY_COMMIT" "$DEPLOY_RELEASE_ID" \
+          "$PREVIOUS_RELEASE" < .github/scripts/activate-release.sh
+
+    - id: verify
+      name: Verify production endpoints, Vue mounts, and rendered pages in Chromium
+      shell: bash
+      env:
+        DEPLOY_COMMIT: ${{ inputs.commit }}
+      run: bash .github/scripts/verify-deployment.sh
+
+    - name: Roll back if activation or health verification failed
+      if: ${{ failure() && steps.environment.outputs.previous_release != '' && (steps.activate.outcome == 'failure' || steps.verify.outcome == 'failure') }}
+      shell: bash
+      env:
+        DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+        DEPLOY_RELEASE_ID: ${{ inputs.release-id }}
+        DEPLOY_COMMIT: ${{ inputs.commit }}
+        PREVIOUS_RELEASE: ${{ steps.environment.outputs.previous_release }}
+      run: |
+        set -euo pipefail
+        source .github/scripts/deployment-config.sh
+        ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" bash -s -- \
+          "$DEPLOY_REMOTE_ROOT_NAME" "$DEPLOY_RELEASES_DIRECTORY" \
+          "$DEPLOY_CURRENT_LINK" "$DEPLOY_RELEASE_ID" \
+          "$PREVIOUS_RELEASE" "$DEPLOY_COMMIT" \
+          < .github/scripts/rollback-release.sh
+
+    - name: Retain recent releases after successful health verification
+      if: ${{ success() }}
+      continue-on-error: true
+      shell: bash
+      env:
+        DEPLOY_SSH_CONFIG: ${{ steps.ssh.outputs.ssh_config }}
+        DEPLOY_RELEASE_ID: ${{ inputs.release-id }}
+        PREVIOUS_RELEASE: ${{ steps.environment.outputs.previous_release }}
+      run: |
+        set -euo pipefail
+        source .github/scripts/deployment-config.sh
+        remote_home="$(ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" 'printf "%s" "$HOME"')"
+        if [[ ! "$remote_home" =~ $DEPLOY_REMOTE_HOME_PATTERN ]]; then
+          echo "::warning::Release cleanup skipped because Litehost returned an unexpected account path."
+          exit 1
+        fi
+        expected_active="$remote_home/$DEPLOY_REMOTE_ROOT_NAME/$DEPLOY_RELEASES_DIRECTORY/$DEPLOY_RELEASE_ID"
+        ssh -F "$DEPLOY_SSH_CONFIG" "$DEPLOY_SSH_ALIAS" bash -s -- \
+          "$DEPLOY_REMOTE_ROOT_NAME" "$DEPLOY_RELEASES_DIRECTORY" \
+          "$DEPLOY_CURRENT_LINK" "$expected_active" "$PREVIOUS_RELEASE" \
+          "$DEPLOY_RELEASE_RETENTION" \
+          < .github/scripts/cleanup-releases.sh

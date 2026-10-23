@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate application and deployment scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build and typecheck frontend
+        run: |
+          npm run build
+          npm run verify:build
+          npm run typecheck
+
+      - name: Install Chromium and verify mobile navigation
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e:nav
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Run Laravel tests
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          DB_URL: ''
+        run: |
+          composer install --prefer-dist --no-interaction --optimize-autoloader
+          composer test
+
+      - name: Test deployment scripts with isolated releases
+        run: bash tests/deployment-scripts.sh
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install --yes shellcheck
+
+      - name: Install actionlint
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Validate shell scripts
+        run: shellcheck .github/scripts/*.sh tests/deployment-scripts.sh
+
+      - name: Validate GitHub Actions workflows
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"

@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { chromium } from '@playwright/test'
 
-const base = (process.env.SMOKE_BASE_URL || 'https://lorenzochukwuebuka.com.ng').replace(/\/$/, '')
+const configuredBase = process.env.SMOKE_BASE_URL
+if (!configuredBase) throw new Error('Set SMOKE_BASE_URL from the deployment configuration before running the production smoke check.')
+const base = configuredBase.replace(/\/$/, '')
 const expectedCommit = process.env.SMOKE_EXPECTED_COMMIT || ''
-const requireIndexable = process.env.SMOKE_REQUIRE_INDEXABLE === '1' || new URL(base).hostname === 'lorenzochukwuebuka.com.ng'
+const requireIndexable = process.env.SMOKE_REQUIRE_INDEXABLE === '1'
 const failures = []
 const report = (message) => console.log(`PASS ${message}`)
 const fail = (message) => { failures.push(message); console.error(`FAIL ${message}`) }

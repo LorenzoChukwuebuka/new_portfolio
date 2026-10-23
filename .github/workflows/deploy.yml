@@ -1,0 +1,109 @@
+name: Deploy Laravel and Vue to Litehost
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - README.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: litehost-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and validate release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.package.outputs.release_id }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build and validate Vite assets
+        run: |
+          npm run build
+          npm run verify:build
+          npm run typecheck
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Run Laravel test suite
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          DB_URL: ''
+        run: |
+          composer install --prefer-dist --no-interaction --optimize-autoloader
+          composer test
+
+      - name: Install production Composer dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Validate and package release
+        id: package
+        run: bash .github/scripts/build-release.sh
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-release
+          path: ${{ steps.package.outputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Activate and verify production release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out deployment scripts
+        uses: actions/checkout@v4
+
+      - name: Download validated release package
+        uses: actions/download-artifact@v4
+        with:
+          name: production-release
+          path: ${{ runner.temp }}/release-package
+
+      - name: Set up Node.js for production browser checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Install browser smoke dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Deploy candidate with guarded rollback
+        uses: ./.github/actions/deploy-release
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.CPANEL_USER }}
+          private-key: ${{ secrets.CPANEL_SSH_SECRET }}
+          public-key: ${{ secrets.CPANEL_PUBLIC_KEY }}
+          known-hosts: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+          ssh-port: ${{ vars.CPANEL_SSH_PORT }}
+          commit: ${{ github.sha }}
+          release-id: ${{ needs.build.outputs.release_id }}
+          artifact-path: ${{ runner.temp }}/release-package/portfolio-release.tar.gz
